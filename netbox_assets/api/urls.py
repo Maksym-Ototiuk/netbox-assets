@@ -5,30 +5,15 @@ from . import views
 app_name = 'netbox_assets'
 
 router = NetBoxRouter()
-router.APIRootView = views.NetboxInventoryRootView
+router.APIRootView = views.NetBoxAssetsRootView
 
 # Assets
 router.register('assets', views.AssetViewSet)
-router.register('inventory-item-types', views.InventoryItemTypeViewSet)
-router.register('inventory-item-groups', views.InventoryItemGroupViewSet)
-router.register('dcim/devices', views.DeviceAssetViewSet)
-router.register('dcim/modules', views.ModuleAssetViewSet)
-router.register('dcim/inventory-items', views.InventoryItemAssetViewSet)
-
-# Asset Roles
 router.register('asset-roles', views.AssetRoleViewSet)
 
-# Deliveries
-router.register('suppliers', views.SupplierViewSet)
-router.register('purchases', views.PurchaseViewSet)
-router.register('deliveries', views.DeliveryViewSet)
-
-# Audit
-router.register('audit-flows', views.AuditFlowViewSet)
-router.register('audit-flowpages', views.AuditFlowPageViewSet)
-router.register('audit-flowpage-assignments', views.AuditFlowPageAssignmentViewSet)
-router.register('audit-trail-sources', views.AuditTrailSourceViewSet)
-router.register('audit-trails', views.AuditTrailViewSet)
-
+# NetBox devices and modules with an additional has_asset_assigned filter
+# (used by the asset assignment forms)
+router.register('dcim/devices', views.DeviceAssetViewSet)
+router.register('dcim/modules', views.ModuleAssetViewSet)
 
 urlpatterns = router.urls

@@ -1,25 +1,16 @@
-from rest_framework import serializers
-
 from netbox.api.serializers import WritableNestedSerializer
 
-from netbox_assets.models import AssetRole, InventoryItemGroup
+from ...models import AssetRole
 
-__all__ = (
-    'NestedAssetRoleSerializer',
-    'NestedInventoryItemGroupSerializer',
-)
+__all__ = ('NestedAssetRoleSerializer',)
 
-
-class NestedInventoryItemGroupSerializer(WritableNestedSerializer):
-    _depth = serializers.IntegerField(source='level', read_only=True)
-
-    class Meta:
-        model = InventoryItemGroup
-        fields = ('id', 'url', 'display', 'name', 'description', '_depth')
 
 class NestedAssetRoleSerializer(WritableNestedSerializer):
-    _depth = serializers.IntegerField(source='level', read_only=True)
+    """
+    Used only for the self-referencing `parent` field of AssetRoleSerializer,
+    the same way as NestedDeviceRoleSerializer in NetBox core.
+    """
 
     class Meta:
         model = AssetRole
-        fields = ('id', 'url', 'display', 'name', 'description', '_depth')
+        fields = ('id', 'url', 'display_url', 'display', 'name')
