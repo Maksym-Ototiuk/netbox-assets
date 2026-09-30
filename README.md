@@ -13,8 +13,6 @@ currently installed**, for example spare parts and equipment in storage.
 > suppliers, purchases, deliveries, warranty tracking, audit flows), use the
 > original plugin.
 
-> **Status:** under development. The first release (0.1.0) is not published yet.
-
 ## Purpose
 
 NetBox documents what is installed in your network. netbox-assets adds a
