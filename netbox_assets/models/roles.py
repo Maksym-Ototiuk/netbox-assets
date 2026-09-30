@@ -1,47 +1,57 @@
+from django.contrib.postgres.indexes import GistIndex
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
-from netbox.models import NestedGroupModel
+from netbox.models import NestedLtreeGroupModel
 from utilities.fields import ColorField
 
+__all__ = ('AssetRole',)
 
-class AssetRole(NestedGroupModel):
+
+class AssetRole(NestedLtreeGroupModel):
     """
     Functional role of an Asset (e.g. Router, Switch, SFP, Line Card).
-    Roles can be nested. Similar to DeviceRole in NetBox core.
+
+    Roles can be nested. The tree is stored in a PostgreSQL ltree column
+    (`path`) that is maintained by database triggers, the same way as
+    DeviceRole in NetBox core. The triggers are installed by the
+    InstallLtreeTriggers operation in the initial migration.
     """
 
-    name = models.CharField(
-        max_length=100,
-    )
-    slug = models.SlugField(
-        max_length=100,
-    )
     color = ColorField(
+        verbose_name=_('color'),
         blank=True,
         default='',
     )
-    description = models.CharField(
-        max_length=200,
-        blank=True,
-    )
+
+    clone_fields = ('parent', 'description')
 
     class Meta:
-        ordering = ('name',)
+        ordering = ('sort_path',)
+        indexes = (
+            GistIndex(fields=['path'], name='netbox_assets_role_path_gist'),
+            models.Index(fields=['sort_path'], name='netbox_assets_role_sort_idx'),
+        )
         constraints = (
             models.UniqueConstraint(
                 fields=('parent', 'name'),
                 name='%(app_label)s_%(class)s_parent_name',
+                nulls_distinct=False,
+                violation_error_message=_(
+                    'An asset role with this name already exists.'
+                ),
             ),
             models.UniqueConstraint(
-                fields=('name',),
-                name='%(app_label)s_%(class)s_name',
-                condition=models.Q(parent__isnull=True),
-                violation_error_message='A top-level role with this name already exists.',
+                fields=('parent', 'slug'),
+                name='%(app_label)s_%(class)s_parent_slug',
+                nulls_distinct=False,
+                violation_error_message=_(
+                    'An asset role with this slug already exists.'
+                ),
             ),
         )
-
-    def __str__(self):
-        return self.name
+        verbose_name = _('asset role')
+        verbose_name_plural = _('asset roles')
 
     def get_color(self):
-        return self.color if self.color else None
+        return self.color or None

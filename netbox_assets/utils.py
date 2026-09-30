@@ -2,7 +2,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 from django.db.models.signals import pre_save
 
-from dcim.models import Device, InventoryItem, Module, Rack
+from dcim.models import Device, Module, Rack
 from netbox.plugins import get_plugin_config
 
 from .choices import AssetStatusChoices
@@ -61,20 +61,18 @@ def asset_clear_old_hw(old_hw):
 
     pre_save.disconnect(prevent_update_serial_asset_tag, sender=Device)
     pre_save.disconnect(prevent_update_serial_asset_tag, sender=Module)
-    pre_save.disconnect(prevent_update_serial_asset_tag, sender=InventoryItem)
     pre_save.disconnect(prevent_update_serial_asset_tag, sender=Rack)
     old_hw.serial = ''
     old_hw.asset_tag = None
     old_hw.save()
     pre_save.connect(prevent_update_serial_asset_tag, sender=Device)
     pre_save.connect(prevent_update_serial_asset_tag, sender=Module)
-    pre_save.connect(prevent_update_serial_asset_tag, sender=InventoryItem)
     pre_save.connect(prevent_update_serial_asset_tag, sender=Rack)
 
 
 def asset_set_new_hw(asset, hw):
     """
-    Asset was assigned to hardware (device/module/inventory item/rack) and we want to
+    Asset was assigned to hardware (device/module/rack) and we want to
     sync some field values from asset to hardware
     Validation if asset can be assigned to hw should be done before calling this function.
     """
@@ -90,21 +88,11 @@ def asset_set_new_hw(asset, hw):
         hw.asset_tag = new_asset_tag
         hw_save = True
     # handle changing of model (<kind>_type)
-    if asset.kind in ['device', 'module', 'rack']:
-        asset_type = getattr(asset, asset.kind + '_type')
-        hw_type = getattr(hw, asset.kind + '_type')
-        if asset_type != hw_type:
-            setattr(hw, asset.kind + '_type', asset_type)
-            hw_save = True
-    # for inventory items also set manufacturer and part_number
-    if asset.inventoryitem_type:
-        if hw.manufacturer != asset.inventoryitem_type.manufacturer:
-            hw.manufacturer = asset.inventoryitem_type.manufacturer
-            hw_save = True
-        part_id = asset.inventoryitem_type.part_number
-        if hw.part_id != part_id:
-            hw.part_id = part_id
-            hw_save = True
+    asset_type = getattr(asset, asset.kind + '_type')
+    hw_type = getattr(hw, asset.kind + '_type')
+    if asset_type != hw_type:
+        setattr(hw, asset.kind + '_type', asset_type)
+        hw_save = True
     if hw_save:
         hw.save()
 
@@ -134,7 +122,6 @@ def query_located(queryset, field_name, values, assets_shown='all'):
         q_installed
         | Q(**{f'device__{field_name}__in': values})
         | Q(**{f'module__device__{field_name}__in': values})
-        | Q(**{f'inventoryitem__device__{field_name}__in': values})
     )
 
     # Q expressions for stored
