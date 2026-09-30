@@ -1,0 +1,11 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+{% load plugins %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item"><a href="{% url 'plugins:netbox_inventory:assetrole_list' %}">{% trans "Asset Roles" %}</a></li>
+  {% for role in object.get_ancestors %}
+    <li class="breadcrumb-item"><a href="{% url 'plugins:netbox_inventory:assetrole' role.pk %}">{{ role }}</a></li>
+  {% endfor %}
+{% endblock %}

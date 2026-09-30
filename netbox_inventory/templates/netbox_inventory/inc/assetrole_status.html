@@ -1,0 +1,27 @@
+{% load helpers %}
+<div class="card">
+  <h5 class="card-header">Asset count by status</h5>
+  <table class="table table-hover object-list">
+    <thead>
+      <tr>
+        <th>Status</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sc in status_counts.values %}
+      {% if sc.count %}
+      <tr>
+        <td>{% badge value=sc.label bg_color=sc.color %}</td>
+        <td>
+          <a href="{% url 'plugins:netbox_inventory:asset_list' %}?role_id={{ object.pk }}&status={{ sc.value }}">
+            {{ sc.count }}
+          </a>
+        </td>
+      </tr>
+      {% endif %}
+      {% empty %}
+      <tr><td class="text-center text-muted" colspan="2">— No assets found —</td></tr>
+      {% endfor %}    </tbody>
+  </table>
+</div>

@@ -1,0 +1,550 @@
+from django.utils.translation import gettext_lazy as _
+
+from core.models import ObjectType
+from dcim.models import DeviceType, Location, Manufacturer, ModuleType, RackType, Site
+from netbox.forms import NetBoxModelForm, PrimaryModelForm
+from tenancy.models import Contact, ContactGroup, Tenant
+from utilities.forms.fields import (
+    ContentTypeChoiceField,
+    DynamicModelChoiceField,
+    JSONField,
+    SlugField,
+)
+from utilities.forms.rendering import FieldSet
+from utilities.forms.widgets import DatePicker
+
+from ..constants import AUDITFLOW_OBJECT_TYPE_CHOICES
+from ..models import *
+from netbox_inventory.choices import HardwareKindChoices
+
+__all__ = (
+    'AssetRoleForm',
+    'AssetForm',
+    'AuditFlowForm',
+    'AuditFlowPageAssignmentForm',
+    'AuditFlowPageForm',
+    'AuditTrailSourceForm',
+    'DeliveryForm',
+    'InventoryItemGroupForm',
+    'InventoryItemTypeForm',
+    'PurchaseForm',
+    'SupplierForm',
+)
+
+
+#
+# Assets
+#
+
+
+class InventoryItemGroupForm(PrimaryModelForm):
+    parent = DynamicModelChoiceField(
+        queryset=InventoryItemGroup.objects.all(),
+        required=False,
+        label='Parent',
+    )
+
+    fieldsets = (
+        FieldSet(
+            'name',
+            'parent',
+            'description',
+            'tags',
+            name='Inventory Item Group',
+        ),
+    )
+
+    class Meta:
+        model = InventoryItemGroup
+        fields = (
+            'name',
+            'parent',
+            'description',
+            'owner',
+            'tags',
+            'comments',
+        )
+
+class AssetRoleForm(PrimaryModelForm):
+    slug = SlugField(slug_source='name')
+    parent = DynamicModelChoiceField(
+        queryset=AssetRole.objects.all(),
+        required=False,
+        label='Parent Role',
+    )
+
+    fieldsets = (
+        FieldSet(
+            'name',
+            'slug',
+            'parent',
+            'color',
+            'description',
+            'tags',
+            name='Asset Role',
+        ),
+    )
+
+    class Meta:
+        model = AssetRole
+        fields = (
+            'name',
+            'slug',
+            'parent',
+            'color',
+            'description',
+            'owner',
+            'tags',
+            'comments',
+        )
+
+class InventoryItemTypeForm(PrimaryModelForm):
+    slug = SlugField(slug_source='model')
+    inventoryitem_group = DynamicModelChoiceField(
+        queryset=InventoryItemGroup.objects.all(),
+        required=False,
+        label='Inventory item group',
+    )
+
+    fieldsets = (
+        FieldSet(
+            'manufacturer',
+            'model',
+            'slug',
+            'description',
+            'part_number',
+            'inventoryitem_group',
+            'tags',
+            name='Inventory Item Type',
+        ),
+    )
+
+    class Meta:
+        model = InventoryItemType
+        fields = (
+            'manufacturer',
+            'model',
+            'slug',
+            'description',
+            'part_number',
+            'inventoryitem_group',
+            'owner',
+            'tags',
+            'comments',
+        )
+
+
+class AssetForm(PrimaryModelForm):
+    manufacturer = DynamicModelChoiceField(
+        queryset=Manufacturer.objects.all(),
+        required=False,
+        initial_params={
+            'device_types': '$device_type',
+            'module_types': '$module_type',
+            'inventoryitem_types': '$inventoryitem_type',
+            'rack_types': '$rack_type',
+        },
+    )
+    device_type = DynamicModelChoiceField(
+        queryset=DeviceType.objects.all(),
+        required=False,
+        query_params={
+            'manufacturer_id': '$manufacturer',
+        },
+    )
+    module_type = DynamicModelChoiceField(
+        queryset=ModuleType.objects.all(),
+        required=False,
+        query_params={
+            'manufacturer_id': '$manufacturer',
+        },
+    )
+    inventoryitem_type = DynamicModelChoiceField(
+        queryset=InventoryItemType.objects.all(),
+        required=False,
+        query_params={
+            'manufacturer_id': '$manufacturer',
+        },
+        label='Inventory item type',
+    )
+    rack_type = DynamicModelChoiceField(
+        queryset=RackType.objects.all(),
+        required=False,
+        query_params={
+            'manufacturer_id': '$manufacturer',
+        },
+    )
+    owning_tenant = DynamicModelChoiceField(
+        queryset=Tenant.objects.all(),
+        help_text=Asset._meta.get_field('owning_tenant').help_text,
+        required=not Asset._meta.get_field('owning_tenant').blank,
+    )
+    purchase = DynamicModelChoiceField(
+        queryset=Purchase.objects.all(),
+        help_text=Asset._meta.get_field('purchase').help_text,
+        required=not Asset._meta.get_field('purchase').blank,
+    )
+    delivery = DynamicModelChoiceField(
+        queryset=Delivery.objects.all(),
+        help_text=Asset._meta.get_field('delivery').help_text,
+        required=not Asset._meta.get_field('delivery').blank,
+        query_params={'purchase_id': '$purchase'},
+    )
+    tenant = DynamicModelChoiceField(
+        queryset=Tenant.objects.all(),
+        help_text=Asset._meta.get_field('tenant').help_text,
+        required=not Asset._meta.get_field('tenant').blank,
+    )
+    contact_group = DynamicModelChoiceField(
+        queryset=ContactGroup.objects.all(),
+        required=False,
+        null_option='None',
+        label='Contact Group',
+        help_text='Filter contacts by group',
+        initial_params={
+            'contact': '$contact',
+        },
+    )
+    contact = DynamicModelChoiceField(
+        queryset=Contact.objects.all(),
+        help_text=Asset._meta.get_field('contact').help_text,
+        required=not Asset._meta.get_field('contact').blank,
+        query_params={
+            'group_id': '$contact_group',
+        },
+    )
+    storage_site = DynamicModelChoiceField(
+        queryset=Site.objects.all(),
+        required=False,
+        initial_params={
+            'locations': '$storage_location',
+        },
+    )
+    storage_location = DynamicModelChoiceField(
+        queryset=Location.objects.all(),
+        help_text=Asset._meta.get_field('storage_location').help_text,
+        required=False,
+        query_params={
+            'site_id': '$storage_site',
+        },
+    )
+    role = DynamicModelChoiceField(
+        queryset=AssetRole.objects.all(),
+        required=False,
+        null_option='None',
+        label='Role',
+    )
+
+    fieldsets = (
+        FieldSet(
+            'name',
+            'asset_tag',
+            'description',
+            'tags',
+            'status',
+            'role',
+            name='General'
+        ),
+        FieldSet(
+            'serial',
+            'manufacturer',
+            'device_type',
+            'module_type',
+            'inventoryitem_type',
+            'rack_type',
+            name='Hardware',
+        ),
+        FieldSet(
+            'owning_tenant',
+            'purchase',
+            'delivery',
+            'warranty_start',
+            'warranty_end',
+            name='Purchase',
+        ),
+        FieldSet('tenant', 'contact_group', 'contact', name='Assigned to'),
+        FieldSet('storage_site', 'storage_location', name='Location'),
+    )
+
+    class Meta:
+        model = Asset
+        fields = (
+            'name',
+            'asset_tag',
+            'serial',
+            'status',
+            'manufacturer',
+            'role',
+            'device_type',
+            'module_type',
+            'inventoryitem_type',
+            'rack_type',
+            'storage_location',
+            'owning_tenant',
+            'purchase',
+            'delivery',
+            'warranty_start',
+            'warranty_end',
+            'tenant',
+            'contact_group',
+            'contact',
+            'tags',
+            'owner',
+            'description',
+            'comments',
+            'storage_site',
+        )
+        widgets = {
+            'warranty_start': DatePicker(),
+            'warranty_end': DatePicker(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Used for picking the default active tab for hardware type selection
+        self.no_hardware_type = True
+        if self.instance:
+            if (
+                self.instance.device_type
+                or self.instance.module_type
+                or self.instance.inventoryitem_type
+                or self.instance.rack_type
+            ):
+                self.no_hardware_type = False
+
+        # if assigned to device/module/... we can't change device_type/...
+        if (
+            self.instance.device
+            or self.instance.module
+            or self.instance.inventoryitem
+            or self.instance.rack
+        ):
+            self.fields['manufacturer'].disabled = True
+            for kind in HardwareKindChoices.values():
+                self.fields[f'{kind}_type'].disabled = True
+
+    def clean(self):
+        super().clean()
+        # if only delivery set, infer purchase from it
+        delivery = self.cleaned_data['delivery']
+        purchase = self.cleaned_data['purchase']
+        if delivery and not purchase:
+            self.cleaned_data['purchase'] = delivery.purchase
+
+
+#
+# Deliveries
+#
+
+
+class SupplierForm(PrimaryModelForm):
+    slug = SlugField(slug_source='name')
+
+    fieldsets = (FieldSet('name', 'slug', 'description', 'tags', name='Supplier'),)
+
+    class Meta:
+        model = Supplier
+        fields = (
+            'name',
+            'slug',
+            'description',
+            'comments',
+            'tags',
+            'owner',
+        )
+
+
+class PurchaseForm(PrimaryModelForm):
+    fieldsets = (
+        FieldSet(
+            'supplier', 'name', 'status', 'date', 'description', 'tags', name='Purchase'
+        ),
+    )
+
+    class Meta:
+        model = Purchase
+        fields = (
+            'supplier',
+            'name',
+            'status',
+            'date',
+            'description',
+            'comments',
+            'tags',
+            'owner',
+        )
+        widgets = {
+            'date': DatePicker(),
+        }
+
+
+class DeliveryForm(PrimaryModelForm):
+    contact_group = DynamicModelChoiceField(
+        queryset=ContactGroup.objects.all(),
+        required=False,
+        null_option='None',
+        label='Contact Group',
+        help_text='Filter receiving contacts by group',
+        initial_params={
+            'contact': '$receiving_contact',
+        },
+    )
+    receiving_contact = DynamicModelChoiceField(
+        queryset=Contact.objects.all(),
+        required=False,
+        help_text=Delivery._meta.get_field('receiving_contact').help_text,
+        query_params={
+            'group_id': '$contact_group',
+        },
+    )
+
+    fieldsets = (
+        FieldSet(
+            'purchase',
+            'name',
+            'date',
+            'contact_group',
+            'receiving_contact',
+            'description',
+            'tags',
+            name='Delivery',
+        ),
+    )
+
+    class Meta:
+        model = Delivery
+        fields = (
+            'purchase',
+            'name',
+            'date',
+            'contact_group',
+            'receiving_contact',
+            'description',
+            'comments',
+            'tags',
+            'owner',
+        )
+        widgets = {
+            'date': DatePicker(),
+        }
+
+
+#
+# Audit
+#
+
+
+class BaseFlowForm(PrimaryModelForm):
+    """
+    Internal base form class for audit flow models.
+    """
+
+    object_type = ContentTypeChoiceField(
+        queryset=ObjectType.objects.public(),
+    )
+    object_filter = JSONField(
+        required=False,
+        help_text=_(
+            'Enter object filter in <a href="https://json.org/">JSON</a> format, '
+            'mapping attributes to values.'
+        ),
+    )
+
+    fieldsets = (
+        FieldSet(
+            'name',
+            'description',
+            'tags',
+        ),
+        FieldSet(
+            'object_type',
+            'object_filter',
+            name=_('Assignment'),
+        ),
+    )
+
+    class Meta:
+        fields = (
+            'name',
+            'description',
+            'tags',
+            'object_type',
+            'object_filter',
+            'owner',
+            'comments',
+        )
+
+
+class AuditFlowPageForm(BaseFlowForm):
+    class Meta(BaseFlowForm.Meta):
+        model = AuditFlowPage
+
+
+class AuditFlowForm(BaseFlowForm):
+    # Restrict inherited object_type to those object types that represent physical
+    # locations.
+    object_type = ContentTypeChoiceField(
+        queryset=ObjectType.objects.public(),
+        limit_choices_to=AUDITFLOW_OBJECT_TYPE_CHOICES,
+    )
+
+    fieldsets = (
+        FieldSet(
+            'name',
+            'description',
+            'tags',
+            'enabled',
+        ),
+        FieldSet(
+            'object_type',
+            'object_filter',
+            name=_('Assignment'),
+        ),
+    )
+
+    class Meta(BaseFlowForm.Meta):
+        model = AuditFlow
+        fields = BaseFlowForm.Meta.fields + ('enabled',)
+
+
+class AuditFlowPageAssignmentForm(NetBoxModelForm):
+    fieldsets = (
+        FieldSet(
+            'flow',
+            'page',
+            'weight',
+        ),
+    )
+
+    class Meta:
+        model = AuditFlowPageAssignment
+        fields = (
+            'flow',
+            'page',
+            'weight',
+        )
+
+
+class AuditTrailSourceForm(PrimaryModelForm):
+    slug = SlugField()
+
+    fieldsets = (
+        FieldSet(
+            'name',
+            'slug',
+            'description',
+            'tags',
+        ),
+    )
+
+    class Meta:
+        model = AuditTrailSource
+        fields = (
+            'name',
+            'slug',
+            'description',
+            'owner',
+            'comments',
+            'tags',
+        )
