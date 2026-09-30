@@ -1,5 +1,5 @@
 {% load helpers %}
-{# renders panel on object (device, module, inventory_item) with asset info assigned to it #}
+{# renders panel on object (device, module, rack) with asset info assigned to it #}
 
 <div class="card">
   <h5 class="card-header">
@@ -12,8 +12,6 @@
         <a href="{% url 'plugins:netbox_assets:asset_device_reassign' object.pk %}" class="btn btn-sm btn-ghost-orange">
         {% elif object_type == "module" %}
         <a href="{% url 'plugins:netbox_assets:asset_module_reassign' object.pk %}" class="btn btn-sm btn-ghost-orange">
-        {% elif object_type == "inventoryitem" %}
-        <a href="{% url 'plugins:netbox_assets:asset_inventoryitem_reassign' object.pk %}" class="btn btn-sm btn-ghost-orange">
         {% elif object_type == "rack" %}
         <a href="{% url 'plugins:netbox_assets:asset_rack_reassign' object.pk %}" class="btn btn-sm btn-ghost-orange">
         {% endif %}
@@ -30,22 +28,12 @@
       <td><a href="{% url "plugins:netbox_assets:asset" asset.pk %}">{{ asset.hardware_type.manufacturer }} {{ asset }}{% if asset.name %} ({{ asset.name }}){% endif %}</a></td>
     </tr>
     <tr>
-      <th scope="row"><span title="Asset status">Status</span></a></th>
-      <td>{% badge asset.get_status_display bg_color=asset.get_status_color %}</a></td>
+      <th scope="row"><span title="Asset status">Status</span></th>
+      <td>{% badge asset.get_status_display bg_color=asset.get_status_color %}</td>
     </tr>
     <tr>
       <th scope="row">Owning tenant</th>
       <td>{{ asset.owning_tenant|linkify|placeholder }}</td>
-    </tr>
-    <tr>
-      <th scope="row">Purchase</th>
-      <td>{{ asset.purchase|linkify|placeholder }}</td>
-    </tr>
-    <tr>
-      <th>Warranty remaining</th>
-      <td>
-        {% include warranty_progressbar with record=asset %}
-      </td>
     </tr>
   </table>
   {% else %}

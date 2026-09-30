@@ -1,7 +1,14 @@
+from django.db.models import Count
+
 from netbox.ui import attrs, panels
 
-from netbox_assets.choices import AssetStatusChoices
-from netbox_assets.models import Asset
+from ..choices import AssetStatusChoices
+from ..models import Asset
+
+__all__ = (
+    'AssetRolePanel',
+    'AssetRoleStatusPanel',
+)
 
 
 class AssetRolePanel(panels.NestedGroupObjectPanel):
@@ -9,35 +16,31 @@ class AssetRolePanel(panels.NestedGroupObjectPanel):
 
 
 class AssetRoleStatusPanel(panels.Panel):
+    """
+    Number of assets per status for an asset role, including assets of all
+    child roles.
+    """
+
     template_name = 'netbox_assets/inc/assetrole_status.html'
+    title = 'Assets by status'
 
     def get_context(self, context):
         ctx = super().get_context(context)
-        instance = context.get('object')
-        request = context.get('request')
-        assets = Asset.objects.restrict(request.user, 'view').filter(
-            role__in=instance.get_descendants(include_self=True)
+        role = ctx['object']
+        assets = Asset.objects.restrict(ctx['request'].user, 'view').filter(
+            role__in=role.get_descendants(include_self=True)
         )
-        status_counts = {
-            key: {
-                'value': key,
+        counts = dict(
+            assets.order_by().values_list('status').annotate(count=Count('pk'))
+        )
+        ctx['status_counts'] = [
+            {
+                'value': value,
                 'label': label,
-                'color': AssetStatusChoices.colors[key],
-                'count': assets.filter(status=key).count(),
+                'color': AssetStatusChoices.colors.get(value),
+                'count': counts[value],
             }
-            for key, label in list(AssetStatusChoices)
-        }
-        ctx['status_counts'] = status_counts
+            for value, label in AssetStatusChoices
+            if counts.get(value)
+        ]
         return ctx
-
-def render(self, context):
-        from django.template.loader import render_to_string
-        request = context.get('request')
-        if request is None:
-            # fallback
-            try:
-                request = context['view'].request
-            except (KeyError, AttributeError):
-                pass
-        ctx = self.get_context(context)
-        return render_to_string(self.template_name, ctx, request=request)

@@ -38,9 +38,6 @@
                 <a class="nav-link{% if form.initial.module_type %} active{% endif %}" href="#module_type" role="tab" data-bs-toggle="tab">Module</a>
               </li>
             <li role="presentation" class="nav-item">
-                <a class="nav-link{% if form.initial.inventoryitem_type %} active{% endif %}" href="#inventoryitem_type" role="tab" data-bs-toggle="tab">Inventory Item</a>
-              </li>
-            <li role="presentation" class="nav-item">
                 <a class="nav-link{% if form.initial.rack_type %} active{% endif %}" href="#rack_type" role="tab" data-bs-toggle="tab">Rack</a>
               </li>
           </ul>
@@ -53,9 +50,6 @@
           <div class="tab-pane{% if form.initial.module_type %} active{% endif %}" id="module_type">
             {% render_field form.module_type %}
           </div>
-          <div class="tab-pane{% if form.initial.inventoryitem_type %} active{% endif %}" id="inventoryitem_type">
-            {% render_field form.inventoryitem_type %}
-          </div>
           <div class="tab-pane{% if form.initial.rack_type %} active{% endif %}" id="rack_type">
             {% render_field form.rack_type %}
           </div>
@@ -64,19 +58,9 @@
 
     <div class="field-group mb-5">
         <div class="row">
-          <h2 class="col-9 offset-3">Purchase</h2>
+          <h2 class="col-9 offset-3">Tenancy</h2>
         </div>
         {% render_field form.owning_tenant %}
-        {% render_field form.purchase %}
-        {% render_field form.delivery %}
-        {% render_field form.warranty_start %}
-        {% render_field form.warranty_end %}
-    </div>
-
-    <div class="field-group mb-5">
-        <div class="row">
-          <h2 class="col-9 offset-3">Assigned to</h2>
-        </div>
         {% render_field form.tenant %}
         {% render_field form.contact_group %}
         {% render_field form.contact %}
@@ -104,6 +88,9 @@
             <div class="row">
                 <h2 class="col-9 offset-3">{% trans "Ownership" %}</h2>
             </div>
+            {% if form.owner_group %}
+                {% render_field form.owner_group %}
+            {% endif %}
             {% render_field form.owner %}
         </div>
     {% endif %}

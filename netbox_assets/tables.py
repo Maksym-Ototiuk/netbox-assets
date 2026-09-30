@@ -8,111 +8,69 @@ from dcim.tables import (
     ModuleTypeTable,
     RackTypeTable,
 )
-from netbox.tables import NetBoxTable, PrimaryModelTable, columns
-from tenancy.tables import ContactsColumnMixin
+from netbox.tables import (
+    NestedGroupModelTable,
+    NetBoxTable,
+    PrimaryModelTable,
+    columns,
+)
 from utilities.tables import register_table_column
 
 from .models import *
-from .template_content import WARRANTY_PROGRESSBAR
 
 __all__ = (
     'AssetRoleTable',
     'AssetTable',
-    'AuditFlowPageAssignmentTable',
-    'AuditFlowPageTable',
-    'AuditFlowTable',
-    'AuditTrailTable',
-    'SupplierTable',
-    'PurchaseTable',
-    'DeliveryTable',
-    'InventoryItemTypeTable',
-    'InventoryItemGroupTable',
 )
+
+
+#
+# Asset roles
+#
+
+
+class AssetRoleTable(NestedGroupModelTable):
+    asset_count = columns.LinkedCountColumn(
+        viewname='plugins:netbox_assets:asset_list',
+        url_params={'role_id': 'pk'},
+        verbose_name=_('Assets'),
+    )
+    color = columns.ColorColumn()
+    tags = columns.TagColumn(
+        url_name='plugins:netbox_assets:assetrole_list',
+    )
+
+    class Meta(NestedGroupModelTable.Meta):
+        model = AssetRole
+        fields = (
+            'pk',
+            'id',
+            'name',
+            'parent',
+            'asset_count',
+            'color',
+            'description',
+            'slug',
+            'owner_group',
+            'owner',
+            'comments',
+            'tags',
+            'actions',
+            'created',
+            'last_updated',
+        )
+        default_columns = (
+            'pk',
+            'name',
+            'asset_count',
+            'color',
+            'description',
+        )
 
 
 #
 # Assets
 #
-
-
-class InventoryItemGroupTable(PrimaryModelTable):
-    name = columns.MPTTColumn(
-        linkify=True,
-    )
-    asset_count = columns.LinkedCountColumn(
-        viewname='plugins:netbox_assets:asset_list',
-        url_params={'inventoryitem_group_id': 'pk'},
-        verbose_name='Assets',
-    )
-    inventoryitem_type_count = columns.LinkedCountColumn(
-        viewname='plugins:netbox_assets:inventoryitemtype_list',
-        url_params={'inventoryitem_group_id': 'pk'},
-        verbose_name='Inventory Item Types',
-    )
-    tags = columns.TagColumn()
-
-    class Meta(NetBoxTable.Meta):
-        model = InventoryItemGroup
-        fields = (
-            'pk',
-            'id',
-            'name',
-            'description',
-            'comments',
-            'tags',
-            'created',
-            'last_updated',
-            'actions',
-            'asset_count',
-            'inventoryitem_type_count',
-        )
-        default_columns = (
-            'name',
-            'asset_count',
-            'inventoryitem_type_count',
-        )
-
-
-class InventoryItemTypeTable(PrimaryModelTable):
-    manufacturer = tables.Column(
-        linkify=True,
-    )
-    model = tables.Column(
-        linkify=True,
-    )
-    inventoryitem_group = tables.Column(
-        linkify=True,
-    )
-    asset_count = columns.LinkedCountColumn(
-        viewname='plugins:netbox_assets:asset_list',
-        url_params={'inventoryitem_type_id': 'pk'},
-        verbose_name='Assets',
-    )
-    tags = columns.TagColumn()
-
-    class Meta(NetBoxTable.Meta):
-        model = InventoryItemType
-        fields = (
-            'pk',
-            'id',
-            'manufacturer',
-            'model',
-            'slug',
-            'part_number',
-            'inventoryitem_group',
-            'description',
-            'comments',
-            'tags',
-            'created',
-            'last_updated',
-            'actions',
-            'asset_count',
-        )
-        default_columns = (
-            'manufacturer',
-            'model',
-            'asset_count',
-        )
 
 
 class AssetTable(PrimaryModelTable):
@@ -134,15 +92,10 @@ class AssetTable(PrimaryModelTable):
         linkify=True,
         verbose_name='Hardware Type',
     )
-    inventoryitem_group = tables.Column(
-        accessor='inventoryitem_type__inventoryitem_group',
-        linkify=True,
-        verbose_name='Inventory Item Group',
-    )
     status = columns.ChoiceFieldColumn()
     hardware = tables.Column(
         linkify=True,
-        order_by=('device', 'module'),
+        order_by=('device', 'module', 'rack'),
     )
     role = columns.ColoredLabelColumn(
         verbose_name=_('Role'),
@@ -180,24 +133,6 @@ class AssetTable(PrimaryModelTable):
     owning_tenant = tables.Column(
         linkify=True,
     )
-    supplier = tables.Column(
-        accessor='purchase__supplier',
-        linkify=True,
-    )
-    purchase = tables.Column(
-        linkify=True,
-    )
-    delivery = tables.Column(
-        linkify=True,
-    )
-    purchase_date = columns.DateColumn(
-        accessor='purchase__date',
-        verbose_name='Purchase Date',
-    )
-    delivery_date = columns.DateColumn(
-        accessor='delivery__date',
-        verbose_name='Delivery Date',
-    )
     current_site = tables.Column(
         linkify=True,
         verbose_name='Current Site',
@@ -208,13 +143,9 @@ class AssetTable(PrimaryModelTable):
         verbose_name='Current Location',
         orderable=False,
     )
-    warranty_progress = columns.TemplateColumn(
-        template_code=WARRANTY_PROGRESSBAR,
-        order_by='warranty_end',
-        # orderable=False,
-        verbose_name='Warranty remaining',
+    tags = columns.TagColumn(
+        url_name='plugins:netbox_assets:asset_list',
     )
-    tags = columns.TagColumn()
     actions = columns.ActionsColumn(
         extra_buttons="""
             {% if record.hardware %}
@@ -237,7 +168,6 @@ class AssetTable(PrimaryModelTable):
             manufacturer=Coalesce(
                 'device_type__manufacturer',
                 'module_type__manufacturer',
-                'inventoryitem_type__manufacturer',
                 'rack_type__manufacturer',
             )
         ).order_by(
@@ -252,7 +182,6 @@ class AssetTable(PrimaryModelTable):
             model=Coalesce(
                 'device_type__model',
                 'module_type__model',
-                'inventoryitem_type__model',
                 'rack_type__model',
             )
         ).order_by(
@@ -267,7 +196,6 @@ class AssetTable(PrimaryModelTable):
             hw=Coalesce(
                 'device__name',
                 'module__device__name',
-                'inventoryitem__device__name',
                 'rack__name',
             )
         ).order_by(
@@ -281,7 +209,6 @@ class AssetTable(PrimaryModelTable):
         queryset = queryset.annotate(
             role_name=Coalesce(
                 'device__role__name',
-                'inventoryitem__role__name',
                 'rack__role__name',
             )
         ).order_by(
@@ -295,24 +222,19 @@ class AssetTable(PrimaryModelTable):
             site_name=Coalesce(
                 'device__site__name',
                 'module__device__site__name',
-                'inventoryitem__device__site__name',
                 'rack__site__name',
             ),
             location_name=Coalesce(
                 'device__location__name',
                 'module__device__location__name',
-                'inventoryitem__device__location__name',
                 'rack__location__name',
             ),
             rack_name=Coalesce(
                 'device__rack__name',
                 'module__device__rack__name',
-                'inventoryitem__device__rack__name',
                 'rack__name',
             ),
-            device_name=Coalesce(
-                'device__name', 'module__device__name', 'inventoryitem__device__name'
-            ),
+            device_name=Coalesce('device__name', 'module__device__name'),
         )
 
     def order_installed_site(self, queryset, is_descending):
@@ -366,7 +288,6 @@ class AssetTable(PrimaryModelTable):
             'kind',
             'manufacturer',
             'hardware_type',
-            'inventoryitem_group',
             'hardware',
             'hardware_role',
             'installed_site',
@@ -380,14 +301,8 @@ class AssetTable(PrimaryModelTable):
             'current_site',
             'current_location',
             'owning_tenant',
-            'supplier',
-            'purchase',
-            'delivery',
-            'purchase_date',
-            'delivery_date',
-            'warranty_start',
-            'warranty_end',
-            'warranty_progress',
+            'owner_group',
+            'owner',
             'description',
             'comments',
             'tags',
@@ -407,348 +322,6 @@ class AssetTable(PrimaryModelTable):
             'status',
             'hardware',
             'tags',
-        )
-
-class AssetRoleTable(PrimaryModelTable):
-    name = columns.MPTTColumn(
-        linkify=True,
-    )
-    color = columns.ColorColumn()
-    asset_count = columns.LinkedCountColumn(
-        viewname='plugins:netbox_assets:asset_list',
-        url_params={'role_id': 'pk'},
-        verbose_name='Assets',
-    )
-    tags = columns.TagColumn()
-
-    class Meta(NetBoxTable.Meta):
-        model = AssetRole
-        fields = (
-            'pk',
-            'id',
-            'name',
-            'slug',
-            'color',
-            'description',
-            'asset_count',
-            'tags',
-            'created',
-            'last_updated',
-            'actions',
-        )
-        default_columns = (
-            'name',
-            'color',
-            'asset_count',
-            'description',
-        )
-
-#
-# Deliveries
-#
-
-
-class SupplierTable(ContactsColumnMixin, PrimaryModelTable):
-    name = tables.Column(
-        linkify=True,
-    )
-    purchase_count = columns.LinkedCountColumn(
-        viewname='plugins:netbox_assets:purchase_list',
-        url_params={'supplier_id': 'pk'},
-        verbose_name='Purchases',
-    )
-    delivery_count = columns.LinkedCountColumn(
-        viewname='plugins:netbox_assets:delivery_list',
-        url_params={'supplier_id': 'pk'},
-        verbose_name='Deliveries',
-    )
-    asset_count = columns.LinkedCountColumn(
-        viewname='plugins:netbox_assets:asset_list',
-        url_params={'supplier_id': 'pk'},
-        verbose_name='Assets',
-    )
-    tags = columns.TagColumn()
-
-    class Meta(NetBoxTable.Meta):
-        model = Supplier
-        fields = (
-            'pk',
-            'id',
-            'name',
-            'slug',
-            'description',
-            'comments',
-            'contacts',
-            'purchase_count',
-            'delivery_count',
-            'asset_count',
-            'tags',
-            'created',
-            'last_updated',
-            'actions',
-        )
-        default_columns = (
-            'name',
-            'asset_count',
-        )
-
-
-class PurchaseTable(PrimaryModelTable):
-    supplier = tables.Column(
-        linkify=True,
-    )
-    name = tables.Column(
-        linkify=True,
-    )
-    status = columns.ChoiceFieldColumn()
-    delivery_count = columns.LinkedCountColumn(
-        viewname='plugins:netbox_assets:delivery_list',
-        url_params={'purchase_id': 'pk'},
-        verbose_name='Deliveries',
-    )
-    asset_count = columns.LinkedCountColumn(
-        viewname='plugins:netbox_assets:asset_list',
-        url_params={'purchase_id': 'pk'},
-        verbose_name='Assets',
-    )
-    tags = columns.TagColumn()
-
-    class Meta(NetBoxTable.Meta):
-        model = Purchase
-        fields = (
-            'pk',
-            'id',
-            'name',
-            'supplier',
-            'status',
-            'date',
-            'description',
-            'comments',
-            'delivery_count',
-            'asset_count',
-            'tags',
-            'created',
-            'last_updated',
-            'actions',
-        )
-        default_columns = (
-            'name',
-            'supplier',
-            'date',
-            'asset_count',
-        )
-
-
-class DeliveryTable(PrimaryModelTable):
-    supplier = tables.Column(
-        accessor=columns.Accessor('purchase__supplier'),
-        linkify=True,
-    )
-    purchase = tables.Column(
-        linkify=True,
-    )
-    date = columns.DateColumn(
-        verbose_name='Delivery Date',
-    )
-    purchase_date = columns.DateColumn(
-        accessor=columns.Accessor('purchase__date'),
-        verbose_name='Purchase Date',
-    )
-    receiving_contact = tables.Column(
-        linkify=True,
-    )
-    name = tables.Column(
-        linkify=True,
-    )
-    asset_count = columns.LinkedCountColumn(
-        viewname='plugins:netbox_assets:asset_list',
-        url_params={'delivery_id': 'pk'},
-        verbose_name='Assets',
-    )
-    tags = columns.TagColumn()
-
-    class Meta(NetBoxTable.Meta):
-        model = Delivery
-        fields = (
-            'pk',
-            'id',
-            'name',
-            'purchase',
-            'supplier',
-            'date',
-            'purchase_date',
-            'receiving_contact',
-            'description',
-            'comments',
-            'asset_count',
-            'tags',
-            'created',
-            'last_updated',
-            'actions',
-        )
-        default_columns = (
-            'name',
-            'purchase',
-            'date',
-            'asset_count',
-        )
-
-
-#
-# Audit
-#
-
-
-class BaseFlowTable(PrimaryModelTable):
-    """
-    Internal base table class for audit flow models.
-    """
-
-    name = tables.Column(
-        linkify=True,
-    )
-    object_type = columns.ContentTypeColumn(
-        verbose_name=_('Object Type'),
-    )
-
-    class Meta(NetBoxTable.Meta):
-        fields = (
-            'pk',
-            'id',
-            'name',
-            'description',
-            'object_type',
-            'object_filter',
-            'comments',
-            'actions',
-        )
-        default_columns = (
-            'name',
-            'object_type',
-        )
-
-
-class AuditFlowPageTable(BaseFlowTable):
-    class Meta(BaseFlowTable.Meta):
-        model = AuditFlowPage
-
-
-class AuditFlowTable(BaseFlowTable):
-    enabled = columns.BooleanColumn()
-
-    class Meta(BaseFlowTable.Meta):
-        model = AuditFlow
-        fields = BaseFlowTable.Meta.fields + ('enabled',)
-        default_columns = BaseFlowTable.Meta.default_columns + ('enabled',)
-
-
-class AuditFlowPageAssignmentTable(NetBoxTable):
-    flow = tables.Column(
-        linkify=True,
-    )
-    page = tables.Column(
-        linkify=True,
-    )
-
-    actions = columns.ActionsColumn(
-        actions=(
-            'edit',
-            'delete',
-        ),
-    )
-
-    class Meta(NetBoxTable.Meta):
-        model = AuditFlowPageAssignment
-        fields = (
-            'pk',
-            'id',
-            'flow',
-            'page',
-            'weight',
-            'actions',
-        )
-        default_columns = (
-            'flow',
-            'page',
-            'weight',
-        )
-
-
-class AuditTrailSourceTable(PrimaryModelTable):
-    name = tables.Column(
-        linkify=True,
-    )
-    tags = columns.TagColumn()
-
-    class Meta(NetBoxTable.Meta):
-        model = AuditTrailSource
-        fields = (
-            'pk',
-            'id',
-            'name',
-            'description',
-            'tags',
-            'comments',
-            'actions',
-        )
-        default_columns = ('name',)
-
-
-class AuditTrailTable(NetBoxTable):
-    object_type = columns.ContentTypeColumn(
-        verbose_name=_('Object Type'),
-    )
-    object = tables.Column(
-        verbose_name=_('Object'),
-        linkify=True,
-        orderable=False,
-    )
-    source = tables.Column(
-        linkify=True,
-    )
-    created = columns.DateTimeColumn(
-        verbose_name=_('Time'),
-        timespec='minutes',
-    )
-    actions = columns.ActionsColumn(
-        actions=('delete',),
-    )
-
-    # Access the audit user via the first associated object change.
-    auditor_user = tables.Column(
-        accessor=tables.A('object_changes__first__user_name'),
-        verbose_name=_('Auditor Username'),
-        orderable=False,
-    )
-    auditor_full_name = tables.Column(
-        accessor=tables.A('object_changes__first__user__get_full_name'),
-        verbose_name=_('Auditor Full Name'),
-        linkify=True,
-        orderable=False,
-    )
-
-    class Meta(NetBoxTable.Meta):
-        model = AuditTrail
-        fields = (
-            'pk',
-            'id',
-            'object_type',
-            'object',
-            'auditor_user',
-            'auditor_full_name',
-            'source',
-            'created',
-            'last_changed',
-            'actions',
-        )
-        default_columns = (
-            'pk',
-            'created',
-            'object_type',
-            'object',
-            'auditor_user',
-            'auditor_full_name',
-            'source',
         )
 
 

@@ -70,21 +70,6 @@
             <th scope="row">{{ object.get_kind_display }} Type</th>
             <td><a href="{{object.hardware_type.get_absolute_url}}">{{ object.hardware_type.manufacturer }} {{ object.hardware_type }}</a></td>
           </tr>
-          {% if object.kind == 'inventoryitem' %}
-          <tr>
-            <th scope="row">Inventory Item Group</th>
-            <td>
-              {% if object.inventoryitem_type.inventoryitem_group %}
-                {% for group in object.inventoryitem_type.inventoryitem_group.get_ancestors %}
-                  {{ group|linkify }} /
-                {% endfor %}
-                {{ object.inventoryitem_type.inventoryitem_group|linkify }}
-              {% else %}
-                {{ ''|placeholder }}
-              {% endif %}
-            </td>
-          </tr>
-          {% endif %}
           <tr>
             <th scope="row" title="Where is this asset stored when not in use">Storage Location</th>
             <td>
@@ -101,7 +86,7 @@
           <div class="card-actions">
             {# only show create button if user has add permissions for the kind of hardware being created #}
             {# django templates don't support parenthesis in if statements, but and has priority over or #}
-            {% if object.kind == 'device' and perms.dcim.add_device or object.kind == 'module' and perms.dcim.add_module or object.kind == 'inventoryitem' and perms.dcim.add_inventoryitem or object.kind == 'rack' and perms.dcim.add_rack %}
+            {% if object.kind == 'device' and perms.dcim.add_device or object.kind == 'module' and perms.dcim.add_module or object.kind == 'rack' and perms.dcim.add_rack %}
               {% if object.hardware %}
                 <a href="#" class="btn btn-sm btn-ghost-dark disabled">
                   <i class="mdi mdi-vector-difference-ba" aria-hidden="true"></i> Create {{ object.get_kind_display }}
@@ -180,33 +165,11 @@
     </div>
     <div class="col col-md-6">
       <div class="card">
-        <h5 class="card-header">Purchase</h5>
+        <h5 class="card-header">Ownership</h5>
         <table class="table table-hover attr-table">
           <tr>
             <th scope="row">Owning tenant</th>
             <td>{{ object.owning_tenant|linkify|placeholder }}</td>
-          </tr>
-          <tr>
-            <th scope="row">Purchase</th>
-            <td>{{ object.purchase|linkify|placeholder }}{% if object.purchase.date %} on {{ object.purchase.date|isodate }}{% endif %}</td>
-          </tr>
-          <tr>
-            <th scope="row">Delivery</th>
-            <td>{{ object.delivery|linkify:'name'|placeholder }}{% if object.delivery.date %} on {{ object.delivery.date|isodate }}{% endif %}</td>
-          </tr>
-          <tr>
-            <th scope="row">Warranty start</th>
-            <td>{{ object.warranty_start|isodate|placeholder }}</td>
-          </tr>
-          <tr>
-            <th scope="row">Warranty end</th>
-            <td>{{ object.warranty_end|isodate|placeholder }}</td>
-          </tr>
-          <tr>
-            <th scope="row">Warranty remaining</th>
-            <td>
-              {% include warranty_progressbar with record=object %}
-            </td>
           </tr>
         </table>
       </div>

@@ -1,4 +1,4 @@
-from dcim.models import Device, InventoryItem, Module, Rack
+from dcim.models import Device, Module, Rack
 from netbox.views import generic
 
 from ..forms.reassign import *
@@ -6,7 +6,6 @@ from ..forms.reassign import *
 __all__ = (
     'AssetDeviceReassignView',
     'AssetModuleReassignView',
-    'AssetInventoryItemReassignView',
     'AssetRackReassignView',
 )
 
@@ -21,12 +20,6 @@ class AssetModuleReassignView(generic.ObjectEditView):
     queryset = Module.objects.all()
     template_name = 'netbox_assets/asset_reassign.html'
     form = AssetModuleReassignForm
-
-
-class AssetInventoryItemReassignView(generic.ObjectEditView):
-    queryset = InventoryItem.objects.all()
-    template_name = 'netbox_assets/asset_reassign.html'
-    form = AssetInventoryItemReassignForm
 
 
 class AssetRackReassignView(generic.ObjectEditView):

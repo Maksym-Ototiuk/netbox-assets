@@ -1,12 +1,10 @@
 from django.db import IntegrityError
-from django.template import Template
 from django.utils.translation import gettext as _
 
 from netbox.views import generic
 from utilities.views import register_model_view
 
 from .. import filtersets, forms, models, tables
-from ..template_content import WARRANTY_PROGRESSBAR
 
 __all__ = (
     'AssetView',
@@ -24,27 +22,19 @@ __all__ = (
 class AssetView(generic.ObjectView):
     queryset = models.Asset.objects.all()
 
-    def get_extra_context(self, request, instance):
-        context = super().get_extra_context(request, instance)
-        context['warranty_progressbar'] = Template(WARRANTY_PROGRESSBAR)
-        return context
-
 
 @register_model_view(models.Asset, 'list', path='', detail=False)
 class AssetListView(generic.ObjectListView):
     queryset = models.Asset.objects.prefetch_related(
         'device_type__manufacturer',
         'module_type__manufacturer',
-        'inventoryitem_type__manufacturer',
         'rack_type__manufacturer',
         'device__role',
         'module__module_bay',
         'module__module_type',
-        'inventoryitem__role',
         'rack__role',
+        'role',
         'owning_tenant',
-        'purchase__supplier',
-        'delivery',
         'storage_location',
     )
     table = tables.AssetTable
@@ -94,8 +84,10 @@ class AssetBulkCreateView(generic.BulkCreateView):
                     form.add_error(
                         None,
                         _('{value}: {field}: {error}').format(
-                            value=value, field=field_label, error=message,
-                        )
+                            value=value,
+                            field=field_label,
+                            error=message,
+                        ),
                     )
 
     def _create_objects_by_count(self, form, request, count):
@@ -132,7 +124,9 @@ class AssetBulkCreateView(generic.BulkCreateView):
                 obj = model_form.save()
                 new_objects.append(obj)
             else:
-                self._add_model_form_errors(form, model_form, value, pattern_field='asset_tag')
+                self._add_model_form_errors(
+                    form, model_form, value, pattern_field='asset_tag'
+                )
                 raise IntegrityError()
 
         return new_objects

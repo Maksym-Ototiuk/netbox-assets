@@ -3,13 +3,3 @@ from .asset_assign import *
 from .asset_create import *
 from .asset_reassign import *
 from .asset_role import *
-from .auditflow import *
-from .auditflowpage import *
-from .auditflowpageassignments import *
-from .audittrail import *
-from .audittrailsource import *
-from .delivery import *
-from .inventoryitem_group import *
-from .inventoryitem_type import *
-from .purchase import *
-from .supplier import *

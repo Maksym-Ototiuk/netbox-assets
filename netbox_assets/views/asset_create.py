@@ -1,4 +1,4 @@
-from dcim.models import Device, InventoryItem, Module, Rack
+from dcim.models import Device, Module, Rack
 from netbox.views import generic
 
 from ..forms.create import *
@@ -7,7 +7,6 @@ from ..models import Asset
 __all__ = (
     'AssetDeviceCreateView',
     'AssetModuleCreateView',
-    'AssetInventoryItemCreateView',
     'AssetRackCreateView',
 )
 
@@ -54,14 +53,6 @@ class AssetModuleCreateView(AssetCreateView):
 
     def get_object(self, **kwargs):
         return Module(assigned_asset=self.asset)
-
-
-class AssetInventoryItemCreateView(AssetCreateView):
-    queryset = InventoryItem.objects.all()
-    form = AssetInventoryItemCreateForm
-
-    def get_object(self, **kwargs):
-        return InventoryItem(assigned_asset=self.asset)
 
 
 class AssetRackCreateView(AssetCreateView):

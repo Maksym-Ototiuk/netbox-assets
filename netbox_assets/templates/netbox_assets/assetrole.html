@@ -1,11 +1,10 @@
 {% extends 'generic/object.html' %}
-{% load helpers %}
-{% load plugins %}
 {% load i18n %}
 
-{% block breadcrumbs %}
-  <li class="breadcrumb-item"><a href="{% url 'plugins:netbox_assets:assetrole_list' %}">{% trans "Asset Roles" %}</a></li>
-  {% for role in object.get_ancestors %}
-    <li class="breadcrumb-item"><a href="{% url 'plugins:netbox_assets:assetrole' role.pk %}">{{ role }}</a></li>
-  {% endfor %}
-{% endblock %}
+{% block extra_controls %}
+  {% if perms.netbox_assets.add_asset %}
+    <a href="{% url 'plugins:netbox_assets:asset_add' %}?role={{ object.pk }}" class="btn btn-primary">
+      <span class="mdi mdi-plus-thick" aria-hidden="true"></span> {% trans "Add Asset" %}
+    </a>
+  {% endif %}
+{% endblock extra_controls %}
