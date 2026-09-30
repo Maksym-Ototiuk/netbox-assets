@@ -1,36 +1,44 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "netbox-inventory"
-version = "2.7.0"
+name = "netbox-assets"
+version = "0.1.0"
 authors = [
-  { name="Matej Vadnjal", email="matej.vadnjal@arnes.si" },
+    { name = "Maksym Ototiuk", email = "pypi@masik.slmail.me" },
 ]
-description = "Inventory asset management in NetBox"
+description = "Simple asset tracking for NetBox. A stripped-down fork of netbox-inventory."
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "Intended Audience :: System Administrators",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
-keywords = ["netbox", "netbox-plugin", "inventory"]
+keywords = ["netbox", "netbox-plugin", "assets", "inventory"]
 
 [project.urls]
-"Homepage" = "https://github.com/ArnesSI/netbox-inventory/"
-"Bug Tracker" = "https://github.com/ArnesSI/netbox-inventory/issues/"
+Homepage = "https://github.com/Maksym-Ototiuk/netbox-assets"
+Issues = "https://github.com/Maksym-Ototiuk/netbox-assets/issues"
+Upstream = "https://github.com/ArnesSI/netbox-inventory"
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["netbox_inventory*"]
+include = ["netbox_assets*"]
 
 [tool.ruff]
 exclude = [
-    "netbox_inventory/migrations",
+    "netbox_assets/migrations",
 ]
 
 [tool.ruff.lint]
@@ -38,7 +46,7 @@ extend-select = ["E4", "E7", "E9", "F", "W", "C", "I"]
 ignore = ["F403", "F405"]
 
 [tool.ruff.lint.isort]
-known-local-folder = ["netbox_inventory"]
+known-local-folder = ["netbox_assets"]
 known-first-party = [
     "netbox",
     "core",
