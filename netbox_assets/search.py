@@ -1,38 +1,6 @@
 from netbox.search import SearchIndex
 
-from .models import (
-    Asset,
-    AssetRole,
-    AuditTrailSource,
-    Delivery,
-    InventoryItemGroup,
-    InventoryItemType,
-    Purchase,
-    Supplier,
-)
-
-#
-# Assets
-#
-
-
-class InventoryItemGroupIndex(SearchIndex):
-    model = InventoryItemGroup
-    fields = (
-        ('name', 100),
-        ('description', 500),
-        ('comments', 5000),
-    )
-
-
-class InventoryItemTypeIndex(SearchIndex):
-    model = InventoryItemType
-    fields = (
-        ('model', 100),
-        ('part_number', 100),
-        ('description', 500),
-        ('comments', 5000),
-    )
+from .models import Asset, AssetRole
 
 
 class AssetIndex(SearchIndex):
@@ -46,6 +14,7 @@ class AssetIndex(SearchIndex):
     )
     display_attrs = ('name', 'asset_tag', 'status')
 
+
 class AssetRoleIndex(SearchIndex):
     model = AssetRole
     fields = (
@@ -54,62 +23,10 @@ class AssetRoleIndex(SearchIndex):
         ('description', 500),
         ('comments', 5000),
     )
-
-
-#
-# Deliveries
-#
-
-
-class SupplierIndex(SearchIndex):
-    model = Supplier
-    fields = (
-        ('name', 100),
-        ('description', 500),
-        ('comments', 5000),
-    )
-
-
-class PurchaseIndex(SearchIndex):
-    model = Purchase
-    fields = (
-        ('name', 100),
-        ('description', 500),
-        ('comments', 5000),
-    )
-
-
-class DeliveryIndex(SearchIndex):
-    model = Delivery
-    fields = (
-        ('name', 100),
-        ('description', 500),
-        ('comments', 5000),
-    )
-
-
-#
-# Audit
-#
-
-
-class AuditTrailSourceIndex(SearchIndex):
-    model = AuditTrailSource
-    fields = (
-        ('name', 100),
-        ('slug', 110),
-        ('description', 500),
-        ('comments', 5000),
-    )
+    display_attrs = ('description',)
 
 
 indexes = [
-    InventoryItemGroupIndex,
-    InventoryItemTypeIndex,
     AssetIndex,
     AssetRoleIndex,
-    SupplierIndex,
-    PurchaseIndex,
-    DeliveryIndex,
-    AuditTrailSourceIndex,
 ]

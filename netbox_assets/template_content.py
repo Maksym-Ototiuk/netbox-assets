@@ -1,65 +1,11 @@
-from django.db.models import Model
-from django.http import HttpRequest
-from django.template import Template
-
-from core.models import ObjectType
 from netbox.plugins import PluginTemplateExtension
 
-from .models import Asset, AuditFlow
+from .models import Asset
 from .utils import query_located
 
 #
 # Assets
 #
-
-WARRANTY_PROGRESSBAR = """
-{% with record.warranty_progress as wp %}
-{% with record.warranty_remaining as wr %}
-{% with settings.PLUGINS_CONFIG.netbox_assets.asset_warranty_expire_warning_days as wthresh %}
-
-{% if wp is None and wr.days <= 0 %}
-  <div class="progress" role="progressbar">
-    <div class="progress-bar progress-bar-striped text-bg-danger" style="width:100%;">
-      Expired {{ record.warranty_end|timesince|split:','|first }} ago
-    </div>
-  </div>
-{% elif wp is None and wr.days > 0 %}
-  <div class="progress" role="progressbar">
-    <div class="progress-bar progress-bar-striped text-bg-{% if wthresh and wr.days < wthresh %}warning{% else %}success{% endif %}" style="width:100%;">
-      {{ record.warranty_end|timeuntil|split:','|first }}
-    </div>
-  </div>
-{% elif wp is None %}
-    {{ ""|placeholder }}
-{% else %}
-
-<div
-  class="progress"
-  role="progressbar"
-  aria-valuemin="0"
-  aria-valuemax="100"
-  aria-valuenow="{% if wp < 0 %}0{% else %}{{ wp }}{% endif %}"
->
-  <div
-    class="progress-bar text-bg-{% if wp >= 100 %}danger{% elif wthresh and wr.days < wthresh %}warning{% else %}success{% endif %}"
-    style="width: {% if wp < 0 %}0%{% else %}{{ wp }}%{% endif %};"
-  ></div>
-  {% if record.warranty_progress >= 100 %}
-    <span class="justify-content-center d-flex align-items-center position-absolute text-light w-100 h-100">Expired {{ record.warranty_end|timesince|split:','|first }} ago</span>
-  {% elif record.warranty_progress >= 35 %}
-    <span class="justify-content-center d-flex align-items-center position-absolute text-body-emphasis w-100 h-100">{{ record.warranty_end|timeuntil|split:','|first }}</span>
-  {% elif record.warranty_progress >= 0 %}
-    <span class="justify-content-center d-flex align-items-center position-absolute text-body-emphasis w-100 h-100">{{ record.warranty_end|timeuntil|split:','|first }}</span>
-  {% else %}
-    <span class="justify-content-center d-flex align-items-center position-absolute text-body-emphasis w-100 h-100">Starts in {{ record.warranty_start|timeuntil|split:','|first }}</span>
-  {% endif %}
-</div>
-
-{% endif %}
-{% endwith wthresh %}
-{% endwith wr %}
-{% endwith wp %}
-"""
 
 
 class AssetInfoExtension(PluginTemplateExtension):
@@ -67,10 +13,7 @@ class AssetInfoExtension(PluginTemplateExtension):
         object = self.context.get('object')
         asset = Asset.objects.filter(**{self.kind: object}).first()
         context = {'asset': asset}
-        context['warranty_progressbar'] = Template(WARRANTY_PROGRESSBAR)
-        return self.render(
-            'netbox_assets/inc/asset_info.html', extra_context=context
-        )
+        return self.render('netbox_assets/inc/asset_info.html', extra_context=context)
 
 
 class AssetLocationCounts(PluginTemplateExtension):
@@ -118,11 +61,6 @@ class ModuleAssetInfo(AssetInfoExtension):
     kind = 'module'
 
 
-class InventoryItemAssetInfo(AssetInfoExtension):
-    models = ['dcim.inventoryitem']
-    kind = 'inventoryitem'
-
-
 class RackAssetInfo(AssetInfoExtension):
     models = ['dcim.rack']
     kind = 'rack'
@@ -134,45 +72,35 @@ class ManufacturerAssetCounts(PluginTemplateExtension):
     def right_page(self):
         object = self.context.get('object')
         user = self.context['request'].user
-        count_device = (
-            Asset.objects.restrict(user, 'view')
-            .filter(device_type__manufacturer=object)
-            .count()
-        )
-        count_module = (
-            Asset.objects.restrict(user, 'view')
-            .filter(module_type__manufacturer=object)
-            .count()
-        )
-        count_inventoryitem = (
-            Asset.objects.restrict(user, 'view')
-            .filter(inventoryitem_type__manufacturer=object)
-            .count()
-        )
+        assets_qs = Asset.objects.restrict(user, 'view')
+        counts = {
+            kind: assets_qs.filter(**{f'{kind}_type__manufacturer': object}).count()
+            for kind in ('device', 'module', 'rack')
+        }
         context = {
             'asset_stats': [
                 {
                     'label': 'Device',
                     'filter_field': 'manufacturer_id',
                     'extra_filter': '&kind=device',
-                    'count': count_device,
+                    'count': counts['device'],
                 },
                 {
                     'label': 'Module',
                     'filter_field': 'manufacturer_id',
                     'extra_filter': '&kind=module',
-                    'count': count_module,
+                    'count': counts['module'],
                 },
                 {
-                    'label': 'Inventory Item',
+                    'label': 'Rack',
                     'filter_field': 'manufacturer_id',
-                    'extra_filter': '&kind=inventoryitem',
-                    'count': count_inventoryitem,
+                    'extra_filter': '&kind=rack',
+                    'count': counts['rack'],
                 },
                 {
                     'label': 'Total',
                     'filter_field': 'manufacturer_id',
-                    'count': count_device + count_module + count_inventoryitem,
+                    'count': sum(counts.values()),
                 },
             ],
         }
@@ -265,67 +193,9 @@ class ContactAssetCounts(PluginTemplateExtension):
         )
 
 
-#
-# Audit
-#
-
-
-class AuditFlowRunButton(PluginTemplateExtension):
-    """
-    Add a button to start an audit flow on the detail pages of applicable objects.
-    """
-
-    models = [
-        'dcim.site',
-        'dcim.location',
-        'dcim.rack',
-    ]
-
-    def get_object(self) -> Model:
-        return self.context['object']
-
-    def get_request(self) -> HttpRequest:
-        return self.context['request']
-
-    def get_flows(self) -> list[AuditFlow]:
-        """
-        Return a list of working audit flows (enabled and with pages) that apply to the
-        current context object.
-        """
-        obj = self.get_object()
-        request = self.get_request()
-
-        object_type = ObjectType.objects.get_for_model(obj)
-        flows = (
-            AuditFlow.objects.filter(
-                object_type=object_type,
-                enabled=True,
-                pages__isnull=False,  # Filter flows with no pages assigned
-            )
-            .restrict(request.user, 'run')
-            .distinct()
-        )
-
-        return [flow for flow in flows if flow.get_objects().filter(pk=obj.pk).exists()]
-
-    def buttons(self):
-        flows = self.get_flows()
-        if not flows:
-            return ''
-
-        return self.render(
-            'netbox_assets/inc/buttons/auditflow_run.html',
-            extra_context={
-                'flows': flows,
-            },
-        )
-
-
 template_extensions = (
-    # Assets
     DeviceAssetInfo,
     ModuleAssetInfo,
-    InventoryItemAssetInfo,
     RackAssetInfo,
     ManufacturerAssetCounts,
     SiteAssetCounts,
@@ -333,6 +203,4 @@ template_extensions = (
     RackAssetCounts,
     TenantAssetCounts,
     ContactAssetCounts,
-    # Audit
-    AuditFlowRunButton,
 )
