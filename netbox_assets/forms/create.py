@@ -1,30 +1,13 @@
 import logging
 
-from django.core.exceptions import ValidationError
-
-from core.models import ObjectType
-from dcim.forms import DeviceForm, InventoryItemForm, ModuleForm, RackForm
-from dcim.models import Device, Rack
+from dcim.forms import DeviceForm, ModuleForm, RackForm
+from dcim.models import Device
 from utilities.forms.fields import DynamicModelChoiceField
-
-from ..utils import get_plugin_setting
 
 __all__ = (
     'AssetDeviceCreateForm',
     'AssetModuleCreateForm',
-    'AssetInventoryItemCreateForm',
     'AssetRackCreateForm',
-)
-
-
-COMPONENT_FIELDS = (
-    'consoleport',
-    'consoleserverport',
-    'frontport',
-    'interface',
-    'poweroutlet',
-    'powerport',
-    'rearport',
 )
 
 logger = logging.getLogger('netbox.netbox_assets.forms.create')
@@ -46,8 +29,8 @@ class AssetCreateMixin:
 
     def save(self, *args):
         """
-        After we save new hardware (Device, Module, InventortyItem), we must update
-        asset.device/.module/.intentory_item to reffer to this new hardware instance
+        After we save new hardware (Device, Module, Rack), we must update
+        asset.device/.module/.rack to refer to this new hardware instance
         """
         asset = self.instance.assigned_asset
         instance = super().save(*args)
@@ -92,67 +75,21 @@ class AssetModuleCreateForm(AssetCreateMixin, ModuleForm):
         return self.instance.assigned_asset.module_type
 
 
-class AssetInventoryItemCreateForm(AssetCreateMixin, InventoryItemForm):
-    """
-    Populates and disables editing of hardware related fields
-    Offers selection of device components and maps selected component
-    to component_type and component_id fields
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if self.instance.assigned_asset:
-            asset = self.instance.assigned_asset
-            self.fields['serial'].disabled = True
-            self.fields['asset_tag'].disabled = True
-            self.fields['part_id'].disabled = True
-            self.fields['manufacturer'].disabled = True
-            self.initial['serial'] = asset.serial
-            self.initial['asset_tag'] = asset.asset_tag if asset.asset_tag else None
-            self.initial['part_id'] = asset.inventoryitem_type.part_number
-            self.initial['manufacturer'] = asset.inventoryitem_type.manufacturer_id
-
-            if get_plugin_setting('prefill_asset_name_create_inventoryitem'):
-                self.initial['name'] = asset.name if asset.name else None
-            if get_plugin_setting('prefill_asset_tag_create_inventoryitem'):
-                self.initial['tags'] = asset.tags.all() if asset.tags else None
-
-    def clean(self):
-        super().clean()
-        component_set = None
-        for field_name in COMPONENT_FIELDS:
-            field_value = self.cleaned_data.get(field_name)
-            if field_value and component_set:
-                raise ValidationError('Only a single component can be selected')
-            if field_value:
-                component_set = field_name
-                self.cleaned_data['component_type'] = ObjectType.objects.get(
-                    app_label='dcim', model=field_name
-                )
-                self.cleaned_data['component_id'] = field_value.pk
-                self.cleaned_data.pop(field_name)
-
-    def clean_manufacturer(self):
-        return self.instance.assigned_asset.inventoryitem_type.manufacturer
-
-
 class AssetRackCreateForm(AssetCreateMixin, RackForm):
     """
     Populates and disables editing of asset and rack_type fields
     """
 
     def __init__(self, *args, **kwargs):
+        # Set rack_type on the new rack before RackForm.__init__() runs. RackForm
+        # then hides the fields that are defined by the rack type, the same way
+        # as when a user selects a rack type in NetBox.
+        instance = kwargs.get('instance')
+        if instance is not None and getattr(instance, 'assigned_asset', None):
+            instance.rack_type = instance.assigned_asset.rack_type
         super().__init__(*args, **kwargs)
         self.update_hardware_fields('rack_type')
 
-        # Omit RackType-defined fields because rack_type is set
-        for field_name in Rack.RACKTYPE_FIELDS:
-            if field_name in self.fields:
-                del self.fields[field_name]
-        # also remove last fieldset that refers to RACKTYPE_FIELDS
-        self.fieldsets = self.fieldsets[:-1]
-
-    def clean_device_type(self):
-        # no mattter what was POSTed, rack_type cannot be changed/missing...
+    def clean_rack_type(self):
+        # no matter what was POSTed, rack_type cannot be changed/missing...
         return self.instance.assigned_asset.rack_type

@@ -149,8 +149,7 @@ class AssetForm(PrimaryModelForm):
             'rack_type',
             name='Hardware',
         ),
-        FieldSet('owning_tenant', name='Ownership'),
-        FieldSet('tenant', 'contact_group', 'contact', name='Assigned to'),
+        FieldSet('owning_tenant', 'tenant', 'contact_group', 'contact', name='Tenancy'),
         FieldSet('storage_site', 'storage_location', name='Location'),
     )
 

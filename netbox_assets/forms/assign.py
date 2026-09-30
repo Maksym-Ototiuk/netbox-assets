@@ -1,20 +1,23 @@
 from django import forms
 
-from dcim.models import Device, InventoryItem, Location, Module, Rack, Site
+from dcim.models import Device, Location, Module, Rack, Site
 from netbox.forms import NetBoxModelForm
 from tenancy.models import Contact, Tenant
 from utilities.forms.fields import DynamicModelChoiceField
 from utilities.forms.rendering import FieldSet
 from utilities.forms.widgets import APISelect
 
+from .. import config
 from ..models import Asset
 
 __all__ = (
     'AssetDeviceAssignForm',
     'AssetModuleAssignForm',
-    'AssetInventoryItemAssignForm',
     'AssetRackAssignForm',
 )
+
+# REST API root of this plugin, e.g. /api/plugins/assets/
+PLUGIN_API_URL = f'/api/plugins/{config.base_url}/'
 
 
 class AssetAssignMixin(forms.Form):
@@ -45,7 +48,7 @@ class AssetAssignMixin(forms.Form):
     def _clean_hardware(self, kind):
         """
         Args:
-            kind (str): one of device, module, inventoryitem, rack
+            kind (str): one of device, module, rack
         """
         hardware = self.cleaned_data[kind]
         if hardware:
@@ -95,7 +98,7 @@ class AssetDeviceAssignForm(AssetAssignMixin, NetBoxModelForm):
         required=False,
         help_text='Set to empty to unassign asset from device',
         widget=APISelect(
-            api_url='/api/plugins/inventory/dcim/devices/',
+            api_url=f'{PLUGIN_API_URL}dcim/devices/',
             attrs={
                 'data-static-params': '[{"queryParam":"has_asset_assigned","queryValue":"false"}]',
             },
@@ -140,7 +143,7 @@ class AssetModuleAssignForm(AssetAssignMixin, NetBoxModelForm):
         required=False,
         help_text='Set to empty to unassign asset from module',
         widget=APISelect(
-            api_url='/api/plugins/inventory/dcim/modules/',
+            api_url=f'{PLUGIN_API_URL}dcim/modules/',
             attrs={
                 'data-static-params': '[{"queryParam":"has_asset_assigned","queryValue":"false"}]',
             },
@@ -171,72 +174,6 @@ class AssetModuleAssignForm(AssetAssignMixin, NetBoxModelForm):
 
     def clean_module(self):
         return self._clean_hardware('module')
-
-
-class AssetInventoryItemAssignForm(AssetAssignMixin, NetBoxModelForm):
-    site = DynamicModelChoiceField(
-        queryset=Site.objects.all(),
-        required=False,
-        initial_params={'devices__inventoryitems': '$inventoryitem'},
-    )
-    on_device = DynamicModelChoiceField(
-        queryset=Device.objects.all(),
-        query_params={'site_id': '$site'},
-        selector=True,
-        required=False,
-        initial_params={'inventoryitems': '$inventoryitem'},
-    )
-    inventoryitem = DynamicModelChoiceField(
-        queryset=InventoryItem.objects.all(),
-        # we can't filter on inventoryitem_type because inventoryitem doesn't
-        # have relation to inventoryitem_type
-        query_params={'device_id': '$on_device'},
-        label='Inventory item',
-        required=False,
-        help_text='Set to empty to unassign asset from inventory item',
-        widget=APISelect(
-            api_url='/api/plugins/inventory/dcim/inventory-items/',
-            attrs={
-                'data-static-params': '[{"queryParam":"has_asset_assigned","queryValue":"false"}]',
-            },
-        ),
-    )
-
-    fieldsets = (
-        FieldSet('name', name='Asset'),
-        FieldSet('site', 'on_device', 'inventoryitem', name='Inventory Item'),
-        FieldSet('tenant', 'contact', name='Tenancy'),
-    )
-
-    class Meta:
-        model = Asset
-        fields = (
-            'inventoryitem_type',
-            'name',
-            'on_device',
-            'inventoryitem',
-            'tenant',
-            'contact',
-        )
-        widgets = {'inventoryitem_type': forms.HiddenInput()}
-
-    def clean_inventoryitem_type(self):
-        return self._clean_hardware_type('inventoryitem')
-
-    def clean_inventoryitem(self):
-        inventoryitem = self.cleaned_data['inventoryitem']
-        if inventoryitem:
-            if self.instance.inventoryitem == inventoryitem:
-                # field was not changed
-                return inventoryitem
-
-            if Asset.objects.filter(inventoryitem=inventoryitem).exists():
-                raise forms.ValidationError(
-                    f'Inventory item {inventoryitem} already has asset assigned'
-                )
-
-        self.instance.inventoryitem = inventoryitem
-        return inventoryitem
 
 
 class AssetRackAssignForm(AssetAssignMixin, NetBoxModelForm):

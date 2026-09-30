@@ -1,83 +1,55 @@
 from django import forms
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.text import slugify
-from django.utils.translation import gettext_lazy as _
 
-from core.models import ObjectType
 from dcim.models import DeviceType, Location, Manufacturer, ModuleType, RackType, Site
-from netbox.forms import NetBoxModelImportForm, PrimaryModelImportForm
+from netbox.forms import NestedGroupModelImportForm, PrimaryModelImportForm
 from tenancy.models import Contact, Tenant
-from utilities.forms.fields import (
-    CSVChoiceField,
-    CSVContentTypeField,
-    CSVModelChoiceField,
-)
+from utilities.forms.fields import CSVChoiceField, CSVModelChoiceField
 
-from ..choices import AssetStatusChoices, HardwareKindChoices, PurchaseStatusChoices
-from ..constants import AUDITFLOW_OBJECT_TYPE_CHOICES
+from ..choices import AssetStatusChoices, HardwareKindChoices
 from ..models import *
 from ..utils import get_plugin_setting
 
 __all__ = (
     'AssetImportForm',
     'AssetRoleImportForm',
-    'AuditFlowImportForm',
-    'AuditFlowPageImportForm',
-    'AuditTrailImportForm',
-    'AuditTrailSourceImportForm',
-    'DeliveryImportForm',
-    'InventoryItemGroupImportForm',
-    'PurchaseImportForm',
-    'SupplierImportForm',
-    'InventoryItemTypeImportForm',
 )
+
+
+#
+# Asset roles
+#
+
+
+class AssetRoleImportForm(NestedGroupModelImportForm):
+    parent = CSVModelChoiceField(
+        queryset=AssetRole.objects.all(),
+        required=False,
+        to_field_name='name',
+        help_text='Name of parent role',
+        error_messages={
+            'invalid_choice': 'Asset role not found.',
+        },
+    )
+
+    class Meta:
+        model = AssetRole
+        fields = (
+            'name',
+            'slug',
+            'parent',
+            'color',
+            'description',
+            'owner',
+            'comments',
+            'tags',
+        )
 
 
 #
 # Assets
 #
-
-
-class InventoryItemGroupImportForm(PrimaryModelImportForm):
-    parent = CSVModelChoiceField(
-        queryset=InventoryItemGroup.objects.all(),
-        required=False,
-        to_field_name='name',
-        help_text='Name of parent group',
-    )
-
-    class Meta:
-        model = InventoryItemGroup
-        fields = ('name', 'parent', 'description', 'owner', 'comments', 'tags')
-
-
-class InventoryItemTypeImportForm(PrimaryModelImportForm):
-    manufacturer = CSVModelChoiceField(
-        queryset=Manufacturer.objects.all(),
-        to_field_name='name',
-        help_text='Manufacturer. It must exist before import.',
-        required=True,
-    )
-    inventoryitem_group = CSVModelChoiceField(
-        queryset=InventoryItemGroup.objects.all(),
-        to_field_name='name',
-        help_text='Group of inventory item types. It must exist before import.',
-        required=False,
-    )
-
-    class Meta:
-        model = InventoryItemType
-        fields = (
-            'model',
-            'slug',
-            'manufacturer',
-            'description',
-            'part_number',
-            'inventoryitem_group',
-            'owner',
-            'comments',
-            'tags',
-        )
 
 
 class AssetImportForm(PrimaryModelImportForm):
@@ -94,7 +66,7 @@ class AssetImportForm(PrimaryModelImportForm):
     )
     model_name = forms.CharField(
         required=True,
-        help_text='Model of this device/module/inventory item/rack type. See "Import settings" for more info.',
+        help_text='Model of this device/module/rack type. See "Import settings" for more info.',
     )
     part_number = forms.CharField(
         required=False,
@@ -136,37 +108,6 @@ class AssetImportForm(PrimaryModelImportForm):
         help_text='Tenant that owns this asset. It must exist before import.',
         required=False,
     )
-    delivery = forms.CharField(
-        help_text='Delivery that delivered this asset. See "Import settings" for more info.',
-        required=False,
-    )
-    delivery_date = forms.DateField(
-        help_text='Date when this delivery was made.',
-        required=False,
-    )
-    receiving_contact = CSVModelChoiceField(
-        queryset=Contact.objects.all(),
-        to_field_name='name',
-        help_text='Contact that accepted this delivery. It must exist before import.',
-        required=False,
-    )
-    purchase = forms.CharField(
-        help_text='Purchase through which this asset was purchased. See "Import settings" for more info.',
-        required=False,
-    )
-    purchase_date = forms.DateField(
-        help_text='Date when this purchase was made.',
-        required=False,
-    )
-    purchase_status = CSVChoiceField(
-        choices=PurchaseStatusChoices, help_text='Status of purchase', required=False
-    )
-    supplier = CSVModelChoiceField(
-        queryset=Supplier.objects.all(),
-        to_field_name='name',
-        help_text='Legal entity this purchase was made from. Required if a new purchase is given.',
-        required=False,
-    )
     tenant = CSVModelChoiceField(
         queryset=Tenant.objects.all(),
         to_field_name='name',
@@ -198,15 +139,6 @@ class AssetImportForm(PrimaryModelImportForm):
             'storage_site',
             'storage_location',
             'owning_tenant',
-            'supplier',
-            'purchase',
-            'purchase_date',
-            'purchase_status',
-            'delivery',
-            'delivery_date',
-            'receiving_contact',
-            'warranty_start',
-            'warranty_end',
             'owner',
             'comments',
             'tenant',
@@ -225,8 +157,6 @@ class AssetImportForm(PrimaryModelImportForm):
             hardware_class = DeviceType
         elif hardware_kind == 'module':
             hardware_class = ModuleType
-        elif hardware_kind == 'inventoryitem':
-            hardware_class = InventoryItemType
         elif hardware_kind == 'rack':
             hardware_class = RackType
         try:
@@ -239,32 +169,6 @@ class AssetImportForm(PrimaryModelImportForm):
             )
         setattr(self.instance, f'{hardware_kind}_type', hardware_type)
         return hardware_type
-
-    def clean_purchase(self):
-        supplier = self.cleaned_data.get('supplier')
-        purchase_name = self.cleaned_data.get('purchase')
-        if not purchase_name:
-            return None
-        try:
-            purchase = Purchase.objects.get(supplier=supplier, name=purchase_name)
-        except ObjectDoesNotExist:
-            raise forms.ValidationError(
-                f'Unable to find purchase {supplier} {purchase_name}'
-            )
-        return purchase
-
-    def clean_delivery(self):
-        purchase = self.cleaned_data.get('purchase')
-        delivery_name = self.cleaned_data.get('delivery')
-        if not delivery_name:
-            return None
-        try:
-            delivery = Delivery.objects.get(purchase=purchase, name=delivery_name)
-        except ObjectDoesNotExist:
-            raise forms.ValidationError(
-                f'Unable to find delivery {purchase} {delivery_name}'
-            )
-        return delivery
 
     def __init__(self, data=None, *args, **kwargs):
         super().__init__(data, *args, **kwargs)
@@ -294,49 +198,24 @@ class AssetImportForm(PrimaryModelImportForm):
         Form's validate_unique calls this method to determine what atributes to
         exclude from uniqness check. Parent method excludes any fields that are
         not present on form. In our case we have model_name field we assign to
-        device_type, module_type, inventoryitem_type or rack_type dinamically.
+        device_type, module_type or rack_type dynamically.
         So we remove those fields from exclusions.
         """
         exclude = super()._get_validation_exclusions()
         exclude.remove('device_type')
         exclude.remove('module_type')
-        exclude.remove('inventoryitem_type')
         exclude.remove('rack_type')
         return exclude
 
     def _create_related_objects(self):  # noqa: C901
         """
-        Create missing related objects (Purchase, DeviceType...). Based on plugin
+        Create missing related objects (DeviceType, Tenant...). Based on plugin
         settings.
         On exceptions we add to form errors so user gets correct feedback that
         something is wrong.
         """
         try:
             # handle creating related resources if they don't exist and enabled in settings
-            if (
-                get_plugin_setting('asset_import_create_purchase')
-                and self.data.get('purchase')
-                and self.data.get('supplier')
-            ):
-                purchase, _ = Purchase.objects.get_or_create(
-                    name=self.data.get('purchase'),
-                    supplier=self._get_or_create_related('supplier'),
-                    defaults={
-                        'date': self._get_clean_value('purchase_date'),
-                        'status': self._get_clean_value('purchase_status'),
-                    },
-                )
-                if self.data.get('delivery'):
-                    Delivery.objects.get_or_create(
-                        name=self.data.get('delivery'),
-                        purchase=purchase,
-                        defaults={
-                            'date': self._get_clean_value('delivery_date'),
-                            'receiving_contact': self._get_clean_value(
-                                'receiving_contact'
-                            ),
-                        },
-                    )
             if (
                 get_plugin_setting('asset_import_create_device_type')
                 and self.data.get('hardware_kind') == 'device'
@@ -361,21 +240,6 @@ class AssetImportForm(PrimaryModelImportForm):
                     manufacturer=self._get_or_create_related('manufacturer'),
                     defaults={
                         'model': self.data.get('model_name'),
-                        'part_number': self._get_clean_value('part_number'),
-                        'description': self._get_clean_value('model_description'),
-                        'comments': self._get_clean_value('model_comments'),
-                    },
-                )
-            if (
-                get_plugin_setting('asset_import_create_inventoryitem_type')
-                and self.data.get('hardware_kind') == 'inventoryitem'
-            ):
-                InventoryItemType.objects.get_or_create(
-                    model__iexact=self.data.get('model_name'),
-                    manufacturer=self._get_or_create_related('manufacturer'),
-                    defaults={
-                        'model': self.data.get('model_name'),
-                        'slug': slugify(self.data.get('model_name')),
                         'part_number': self._get_clean_value('part_number'),
                         'description': self._get_clean_value('model_description'),
                         'comments': self._get_clean_value('model_comments'),
@@ -447,159 +311,3 @@ class AssetImportForm(PrimaryModelImportForm):
         except forms.ValidationError as e:
             self.add_error(field_name, e)
             raise
-
-class AssetRoleImportForm(PrimaryModelImportForm):
-    parent = CSVModelChoiceField(
-        queryset=AssetRole.objects.all(),
-        required=False,
-        to_field_name='name',
-        help_text='Name of parent role',
-    )
-
-    class Meta:
-        model = AssetRole
-        fields = ('name', 'slug', 'parent', 'color', 'description', 'comments', 'tags')
-
-#
-# Deliveries
-#
-
-
-class SupplierImportForm(PrimaryModelImportForm):
-    class Meta:
-        model = Supplier
-        fields = ('name', 'slug', 'description', 'owner', 'comments', 'tags')
-
-
-class PurchaseImportForm(PrimaryModelImportForm):
-    supplier = CSVModelChoiceField(
-        queryset=Supplier.objects.all(),
-        to_field_name='name',
-        help_text='Legal entity this purchase was made at. It must exist when importing.',
-        required=True,
-    )
-    status = CSVChoiceField(
-        choices=PurchaseStatusChoices,
-        help_text='Status of purchase',
-    )
-
-    class Meta:
-        model = Purchase
-        fields = (
-            'name',
-            'date',
-            'status',
-            'supplier',
-            'description',
-            'owner',
-            'comments',
-            'tags',
-        )
-
-
-class DeliveryImportForm(PrimaryModelImportForm):
-    purchase = CSVModelChoiceField(
-        queryset=Purchase.objects.all(),
-        to_field_name='id',
-        help_text='Purchase that this delivery is part of. It must exist when importing.',
-        required=True,
-    )
-    receiving_contact = CSVModelChoiceField(
-        queryset=Contact.objects.all(),
-        to_field_name='id',
-        help_text='Contact that accepted this delivery. It must exist when importing.',
-        required=False,
-    )
-
-    class Meta:
-        model = Delivery
-        fields = (
-            'name',
-            'date',
-            'purchase',
-            'receiving_contact',
-            'description',
-            'owner',
-            'comments',
-            'tags',
-        )
-
-
-#
-# Audit
-#
-
-
-class BaseFlowImportForm(PrimaryModelImportForm):
-    """
-    Internal base bulk import class for audit flow models.
-    """
-
-    object_type = CSVContentTypeField(
-        queryset=ObjectType.objects.public(),
-        help_text=_('Object Type'),
-    )
-
-    class Meta:
-        fields = (
-            'name',
-            'description',
-            'owner',
-            'tags',
-            'object_type',
-            'object_filter',
-            'comments',
-        )
-
-
-class AuditFlowPageImportForm(BaseFlowImportForm):
-    class Meta(BaseFlowImportForm.Meta):
-        model = AuditFlowPage
-
-
-class AuditFlowImportForm(BaseFlowImportForm):
-    # Restrict inherited object_type to those object types that represent physical
-    # locations.
-    object_type = CSVContentTypeField(
-        queryset=ObjectType.objects.public(),
-        limit_choices_to=AUDITFLOW_OBJECT_TYPE_CHOICES,
-        help_text=_('Object Type'),
-    )
-
-    class Meta(BaseFlowImportForm.Meta):
-        model = AuditFlow
-        fields = BaseFlowImportForm.Meta.fields + ('enabled',)
-
-
-class AuditTrailSourceImportForm(PrimaryModelImportForm):
-    class Meta:
-        model = AuditTrailSource
-        fields = (
-            'name',
-            'slug',
-            'description',
-            'owner',
-            'tags',
-            'comments',
-        )
-
-
-class AuditTrailImportForm(NetBoxModelImportForm):
-    object_type = CSVContentTypeField(
-        queryset=ObjectType.objects.public(),
-        help_text=_('Object Type'),
-    )
-    source = CSVModelChoiceField(
-        queryset=AuditTrailSource.objects.all(),
-        to_field_name='slug',
-        required=False,
-        help_text=_('Source slug of this audit trail.'),
-    )
-
-    class Meta:
-        model = AuditTrail
-        fields = (
-            'object_type',
-            'object_id',
-            'source',
-        )

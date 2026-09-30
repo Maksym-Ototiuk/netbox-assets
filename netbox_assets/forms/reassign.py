@@ -2,27 +2,18 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from dcim.models import (
-    Device,
-    InventoryItem,
-    Location,
-    Manufacturer,
-    Module,
-    Rack,
-    Site,
-)
+from dcim.models import Device, Location, Module, Rack, Site
 from netbox.forms import NetBoxModelForm
 from utilities.forms.fields import DynamicModelChoiceField
 from utilities.forms.rendering import FieldSet
 
 from ..choices import AssetStatusChoices
-from ..models import Asset, InventoryItemGroup, InventoryItemType
+from ..models import Asset
 from ..utils import get_status_for
 
 __all__ = (
     'AssetDeviceReassignForm',
     'AssetModuleReassignForm',
-    'AssetInventoryItemReassignForm',
     'AssetRackReassignForm',
 )
 
@@ -179,69 +170,6 @@ class AssetModuleReassignForm(AssetReassignMixin, NetBoxModelForm):
     class Meta:
         model = Module
         fields = AssetReassignMixin.Meta.fields
-
-
-class AssetInventoryItemReassignForm(AssetReassignMixin, NetBoxModelForm):
-    manufacturer = DynamicModelChoiceField(
-        queryset=Manufacturer.objects.all(),
-        required=False,
-        help_text='Limit New Asset choices only to assets by this manufacturer',
-    )
-    inventoryitem_group = DynamicModelChoiceField(
-        queryset=InventoryItemGroup.objects.all(),
-        required=False,
-        label='Inventory Item Group',
-        help_text='Limit New Asset choices only to assets belonging to this inventory item group',
-    )
-    inventoryitem_type = DynamicModelChoiceField(
-        queryset=InventoryItemType.objects.all(),
-        required=False,
-        query_params={
-            'manufacturer_id': '$manufacturer',
-            'inventoryitem_group_id': '$inventoryitem_group',
-        },
-        label='Inventory Item Type',
-        help_text='Limit New Asset choices only to assets of this inventory item type',
-    )
-    assigned_asset = DynamicModelChoiceField(
-        queryset=Asset.objects.filter(
-            inventoryitem_type__isnull=False, inventoryitem__isnull=True
-        ),
-        required=False,
-        selector=True,
-        query_params={
-            'kind': 'inventoryitem',
-            'is_assigned': False,
-            'storage_site_id': '$storage_site',
-            'storage_location_id': '$storage_location',
-            'manufacturer_id': '$manufacturer',
-            'inventoryitem_type_id': '$inventoryitem_type',
-            'inventoryitem_group_id': '$inventoryitem_group',
-        },
-        label='New Asset',
-        help_text='New asset to assign to inventory item. Set to blank to remove assignment.',
-    )
-
-    fieldsets = (
-        FieldSet(
-            'manufacturer',
-            'inventoryitem_group',
-            'inventoryitem_type',
-            'storage_site',
-            'storage_location',
-            'assigned_asset',
-            name=_('New Asset'),
-        ),
-        FieldSet('asset_status', name=_('Old Asset')),
-    )
-
-    class Meta:
-        model = InventoryItem
-        fields = (
-            'manufacturer',
-            'inventoryitem_group',
-            'inventoryitem_type',
-        ) + AssetReassignMixin.Meta.fields
 
 
 class AssetRackReassignForm(AssetReassignMixin, NetBoxModelForm):
