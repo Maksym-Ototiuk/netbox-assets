@@ -363,10 +363,13 @@ class Asset(PrimaryModel, ImageAttachmentsMixin):
         return AssetStatusChoices.colors.get(self.status)
 
     def __str__(self):
-        if self.serial:
-            return f'{self.hardware_type} {self.serial}'
-        else:
-            return f'{self.hardware_type} (id:{self.id})'
+        # "<manufacturer> <model> <name>", e.g. "Cisco ASR edge-01",
+        # or just "<manufacturer> <model>" when the asset has no name
+        hardware_type = self.hardware_type
+        label = hardware_type.full_name if hardware_type else ''
+        if self.name:
+            return f'{label} {self.name}'.strip()
+        return label
 
     class Meta:
         ordering = (
