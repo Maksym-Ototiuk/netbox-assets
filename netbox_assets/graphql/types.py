@@ -1,157 +1,80 @@
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 import strawberry_django
 
-from dcim.graphql.types import (
-    DeviceType,
-    DeviceTypeType,
-    LocationType,
-    ManufacturerType,
-    ModuleType,
-    ModuleTypeType,
-    RackType,
-    RackTypeType,
-)
-from extras.graphql.mixins import ContactsMixin, ImageAttachmentsMixin
-from netbox.graphql.types import NetBoxObjectType, OrganizationalObjectType
-from tenancy.graphql.types import ContactType, TenantType
+from extras.graphql.mixins import ImageAttachmentsMixin
+from netbox.graphql.types import NestedLtreeGroupObjectType, PrimaryObjectType
 
-from .filters import (
-    AssetFilter,
-    AssetRoleFilter,
-    DeliveryFilter,
-    InventoryItemGroupFilter,
-    InventoryItemTypeFilter,
-    PurchaseFilter,
-    SupplierFilter,
-)
-from netbox_assets.models import (
-    Asset,
-    AssetRole,
-    Delivery,
-    InventoryItemGroup,
-    InventoryItemType,
-    Purchase,
-    Supplier,
+from .. import models
+from .filters import AssetFilter, AssetRoleFilter
+
+if TYPE_CHECKING:
+    # Only for type checkers and linters; at runtime the core types are
+    # resolved lazily via strawberry.lazy()
+    from dcim.graphql.types import (
+        DeviceType,
+        DeviceTypeType,
+        LocationType,
+        ModuleType,
+        ModuleTypeType,
+        RackType,
+        RackTypeType,
+    )
+    from tenancy.graphql.types import ContactType, TenantType
+
+__all__ = (
+    'AssetRoleType',
+    'AssetType',
 )
 
 
-@strawberry_django.type(Asset, fields='__all__', filters=AssetFilter)
-class AssetType(ImageAttachmentsMixin, NetBoxObjectType):
+@strawberry_django.type(
+    models.AssetRole,
+    # ltree internals are not exposed, the same as for DeviceRole in NetBox core;
+    # the tree depth is available as the `level` field
+    exclude=['path', 'sort_path'],
+    filters=AssetRoleFilter,
+    pagination=True,
+)
+class AssetRoleType(NestedLtreeGroupObjectType):
+    parent: (
+        Annotated['AssetRoleType', strawberry.lazy('netbox_assets.graphql.types')]
+        | None
+    )
+    children: list[
+        Annotated['AssetRoleType', strawberry.lazy('netbox_assets.graphql.types')]
+    ]
+    assets: list[Annotated['AssetType', strawberry.lazy('netbox_assets.graphql.types')]]
+    color: str
+
+
+@strawberry_django.type(
+    models.Asset,
+    fields='__all__',
+    filters=AssetFilter,
+    pagination=True,
+)
+class AssetType(ImageAttachmentsMixin, PrimaryObjectType):
+    role: (
+        Annotated['AssetRoleType', strawberry.lazy('netbox_assets.graphql.types')]
+        | None
+    )
     device_type: (
         Annotated['DeviceTypeType', strawberry.lazy('dcim.graphql.types')] | None
     )
     module_type: (
         Annotated['ModuleTypeType', strawberry.lazy('dcim.graphql.types')] | None
     )
-    inventoryitem_type: (
-        Annotated[
-            'InventoryItemTypeType', strawberry.lazy('netbox_assets.graphql.types')
-        ]
-        | None
-    )
     rack_type: Annotated['RackTypeType', strawberry.lazy('dcim.graphql.types')] | None
-    tenant: Annotated['TenantType', strawberry.lazy('tenancy.graphql.types')] | None
     device: Annotated['DeviceType', strawberry.lazy('dcim.graphql.types')] | None
     module: Annotated['ModuleType', strawberry.lazy('dcim.graphql.types')] | None
-    contact: Annotated['ContactType', strawberry.lazy('tenancy.graphql.types')] | None
-    inventoryitem: (
-        Annotated['InventoryItemType', strawberry.lazy('dcim.graphql.types')] | None
-    )
     rack: Annotated['RackType', strawberry.lazy('dcim.graphql.types')] | None
+    tenant: Annotated['TenantType', strawberry.lazy('tenancy.graphql.types')] | None
+    contact: Annotated['ContactType', strawberry.lazy('tenancy.graphql.types')] | None
+    owning_tenant: (
+        Annotated['TenantType', strawberry.lazy('tenancy.graphql.types')] | None
+    )
     storage_location: (
         Annotated['LocationType', strawberry.lazy('dcim.graphql.types')] | None
     )
-    owner: Annotated['TenantType', strawberry.lazy('tenancy.graphql.types')] | None
-    delivery: (
-        Annotated['DeliveryType', strawberry.lazy('netbox_assets.graphql.types')]
-        | None
-    )
-    purchase: (
-        Annotated['PurchaseType', strawberry.lazy('netbox_assets.graphql.types')]
-        | None
-    )
-
-@strawberry_django.type(
-    AssetRole, fields='__all__', filters=AssetRoleFilter
-)
-class AssetRoleType(OrganizationalObjectType):
-    parent: (
-        Annotated[
-            'AssetRoleType', strawberry.lazy('netbox_assets.graphql.types')
-        ]
-        | None
-    )
-    children: list[
-        Annotated[
-            'AssetRoleType', strawberry.lazy('netbox_assets.graphql.types')
-        ]
-    ]
-
-@strawberry_django.type(Supplier, fields='__all__', filters=SupplierFilter)
-class SupplierType(ContactsMixin, NetBoxObjectType):
-    purchases: list[
-        Annotated['PurchaseType', strawberry.lazy('netbox_assets.graphql.types')]
-    ]
-
-
-@strawberry_django.type(Purchase, fields='__all__', filters=PurchaseFilter)
-class PurchaseType(NetBoxObjectType):
-    supplier: Annotated[
-        'SupplierType', strawberry.lazy('netbox_assets.graphql.types')
-    ]
-    assets: list[
-        Annotated['AssetType', strawberry.lazy('netbox_assets.graphql.types')]
-    ]
-    orders: list[
-        Annotated['DeliveryType', strawberry.lazy('netbox_assets.graphql.types')]
-    ]
-
-
-@strawberry_django.type(Delivery, fields='__all__', filters=DeliveryFilter)
-class DeliveryType(NetBoxObjectType):
-    purchase: Annotated[
-        'PurchaseType', strawberry.lazy('netbox_assets.graphql.types')
-    ]
-    receiving_contact: (
-        Annotated['ContactType', strawberry.lazy('tenancy.graphql.types')] | None
-    )
-    assets: list[
-        Annotated['AssetType', strawberry.lazy('netbox_assets.graphql.types')]
-    ]
-
-
-@strawberry_django.type(
-    InventoryItemType, fields='__all__', filters=InventoryItemTypeFilter
-)
-class InventoryItemTypeType(ImageAttachmentsMixin, NetBoxObjectType):
-    manufacturer: Annotated['ManufacturerType', strawberry.lazy('dcim.graphql.types')]
-    inventoryitem_group: (
-        Annotated[
-            'InventoryItemGroupType', strawberry.lazy('netbox_assets.graphql.types')
-        ]
-        | None
-    )
-
-
-@strawberry_django.type(
-    InventoryItemGroup, fields='__all__', filters=InventoryItemGroupFilter
-)
-class InventoryItemGroupType(OrganizationalObjectType):
-    parent: (
-        Annotated[
-            'InventoryItemGroupType', strawberry.lazy('netbox_assets.graphql.types')
-        ]
-        | None
-    )
-    inventoryitem_types: list[
-        Annotated[
-            'InventoryItemTypeType', strawberry.lazy('netbox_assets.graphql.types')
-        ]
-    ]
-    children: list[
-        Annotated[
-            'InventoryItemGroupType', strawberry.lazy('netbox_assets.graphql.types')
-        ]
-    ]

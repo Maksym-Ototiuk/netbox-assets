@@ -1,17 +1,7 @@
-from .schema import (
-    AssetQuery,
-    DeliveryQuery,
-    InventoryItemGroupQuery,
-    InventoryItemTypeQuery,
-    PurchaseQuery,
-    SupplierQuery,
-)
+from .schema import NetBoxAssetsQuery
 
+# Loaded by NetBox as the plugin's GraphQL schema (PluginConfig resource
+# 'graphql.schema'). The query fields are merged into NetBox's root Query.
 schema = [
-    AssetQuery,
-    SupplierQuery,
-    PurchaseQuery,
-    DeliveryQuery,
-    InventoryItemTypeQuery,
-    InventoryItemGroupQuery,
+    NetBoxAssetsQuery,
 ]

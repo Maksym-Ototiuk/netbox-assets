@@ -1,50 +1,43 @@
+from typing import Annotated
+
+import strawberry
 import strawberry_django
-from strawberry_django.filters import FilterLookup
+from strawberry import ID
+from strawberry_django import StrFilterLookup
 
-from netbox.graphql.filters import BaseModelFilter
+from netbox.graphql.filters import NestedGroupModelFilter, PrimaryModelFilter
 
-from netbox_assets import models
+from .. import models
 
 __all__ = (
     'AssetFilter',
     'AssetRoleFilter',
-    'SupplierFilter',
-    'PurchaseFilter',
-    'DeliveryFilter',
-    'InventoryItemTypeFilter',
-    'InventoryItemGroupFilter',
 )
 
 
-@strawberry_django.filter(models.Asset, lookups=True)
-class AssetFilter(BaseModelFilter):
-    pass
-
-@strawberry_django.filter(models.AssetRole, lookups=True)
-class AssetRoleFilter(BaseModelFilter):
-    name: FilterLookup[str] | None = strawberry_django.filter_field()
-    slug: FilterLookup[str] | None = strawberry_django.filter_field()
-
-@strawberry_django.filter(models.Supplier, lookups=True)
-class SupplierFilter(BaseModelFilter):
-    pass
+@strawberry_django.filter_type(models.AssetRole, lookups=True)
+class AssetRoleFilter(NestedGroupModelFilter):
+    color: StrFilterLookup | None = strawberry_django.filter_field()
 
 
-@strawberry_django.filter(models.Purchase, lookups=True)
-class PurchaseFilter(BaseModelFilter):
-    pass
-
-
-@strawberry_django.filter(models.Delivery, lookups=True)
-class DeliveryFilter(BaseModelFilter):
-    pass
-
-
-@strawberry_django.filter(models.InventoryItemType, lookups=True)
-class InventoryItemTypeFilter(BaseModelFilter):
-    pass
-
-
-@strawberry_django.filter(models.InventoryItemGroup, lookups=True)
-class InventoryItemGroupFilter(BaseModelFilter):
-    pass
+@strawberry_django.filter_type(models.Asset, lookups=True)
+class AssetFilter(PrimaryModelFilter):
+    name: StrFilterLookup | None = strawberry_django.filter_field()
+    asset_tag: StrFilterLookup | None = strawberry_django.filter_field()
+    serial: StrFilterLookup | None = strawberry_django.filter_field()
+    status: StrFilterLookup | None = strawberry_django.filter_field()
+    role: (
+        Annotated['AssetRoleFilter', strawberry.lazy('netbox_assets.graphql.filters')]
+        | None
+    ) = strawberry_django.filter_field()
+    role_id: ID | None = strawberry_django.filter_field()
+    device_type_id: ID | None = strawberry_django.filter_field()
+    module_type_id: ID | None = strawberry_django.filter_field()
+    rack_type_id: ID | None = strawberry_django.filter_field()
+    device_id: ID | None = strawberry_django.filter_field()
+    module_id: ID | None = strawberry_django.filter_field()
+    rack_id: ID | None = strawberry_django.filter_field()
+    tenant_id: ID | None = strawberry_django.filter_field()
+    contact_id: ID | None = strawberry_django.filter_field()
+    owning_tenant_id: ID | None = strawberry_django.filter_field()
+    storage_location_id: ID | None = strawberry_django.filter_field()
