@@ -52,7 +52,7 @@ The goal is simple record keeping, not full inventory management.
 
 | NetBox           | netbox-assets |
 | ---------------- | ------------- |
-| 4.7.1 and later  | 0.1.x         |
+| 4.7.2 and later  | 0.1.x         |
 
 NetBox 4.7 requires Python 3.12 or later, PostgreSQL 15 or later with the
 `ltree` extension, and Redis 6 or later.
