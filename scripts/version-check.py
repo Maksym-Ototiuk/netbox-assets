@@ -4,14 +4,14 @@ import sys
 tag = sys.argv[1]
 tag_version = tag.lstrip("v")
 
-ftxt = open("netbox_inventory/version.py", "r").read()
+ftxt = open("netbox_assets/version.py", "r").read()
 if m:= re.search(r"__version__\s*=\s*[\"'](\d+\.\d+\.\d+)[\"']", ftxt, re.MULTILINE):
     ver_code = m.group(1)
 else:
     sys.stderr.write("Could not find version in version.py\n")
     sys.exit(1)
 
-ttxt = open("netbox_inventory/tests/test_load.py", "r").read()
+ttxt = open("netbox_assets/tests/test_load.py", "r").read()
 if m:= re.search(r"__version__\s*==\s*[\"'](\d+\.\d+\.\d+)[\"']", ttxt, re.MULTILINE):
     test_code = m.group(1)
 else:

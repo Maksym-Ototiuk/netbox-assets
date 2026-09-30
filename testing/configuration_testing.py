@@ -38,5 +38,5 @@ API_TOKEN_PEPPERS = {
 }
 
 PLUGINS = [
-    'netbox_inventory',
+    'netbox_assets',
 ]
