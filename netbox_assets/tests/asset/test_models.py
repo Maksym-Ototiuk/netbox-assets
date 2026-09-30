@@ -1,33 +1,22 @@
-from django.forms import ValidationError
+from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 
-from dcim.models import Device, DeviceRole, DeviceType, Manufacturer, Site
+from dcim.models import (
+    Device,
+    DeviceRole,
+    DeviceType,
+    Manufacturer,
+    ModuleType,
+    Site,
+)
 from utilities.exceptions import AbortRequest
 
-from ..settings import CONFIG_SYNC_OFF, CONFIG_SYNC_ON
-from netbox_assets.models import Asset, Delivery, Purchase, Supplier
+from netbox_assets.models import Asset
+from netbox_assets.tests.settings import CONFIG_SYNC_OFF, CONFIG_SYNC_ON
 
 
 class TestAssetModel(TestCase):
     def setUp(self):
-        self.supplier1 = Supplier.objects.create(
-            name='Supplier1',
-            slug='supplier1',
-        )
-        self.purchase1 = Purchase.objects.create(
-            name='Purchase1',
-            supplier=self.supplier1,
-            status='closed',
-        )
-        self.purchase2 = Purchase.objects.create(
-            name='Purchase2',
-            supplier=self.supplier1,
-            status='closed',
-        )
-        self.delivery1 = Delivery.objects.create(
-            name='Delivery1',
-            purchase=self.purchase1,
-        )
         self.site1 = Site.objects.create(
             name='site1',
             slug='site1',
@@ -39,6 +28,9 @@ class TestAssetModel(TestCase):
         )
         self.device_type1 = DeviceType.objects.create(
             manufacturer=self.manufacturer1, model='device_type1', slug='device_type1'
+        )
+        self.module_type1 = ModuleType.objects.create(
+            manufacturer=self.manufacturer1, model='module_type1'
         )
         self.role1 = DeviceRole.objects.create(name='role1', slug='role1')
         self.asset1 = Asset.objects.create(
@@ -61,6 +53,24 @@ class TestAssetModel(TestCase):
             role=self.role1,
             name='device2',
         )
+
+    def test_str(self):
+        # "<manufacturer> <model>" without a name, "<manufacturer> <model> <name>" with it
+        self.assertEqual(str(self.asset1), 'manufacturer1 device_type1')
+        self.asset1.name = 'edge-01'
+        self.assertEqual(str(self.asset1), 'manufacturer1 device_type1 edge-01')
+        module_asset = Asset(module_type=self.module_type1, status='stored')
+        self.assertEqual(str(module_asset), 'manufacturer1 module_type1')
+
+    def test_hardware_type_required(self):
+        asset = Asset(status='stored')
+        with self.assertRaises(ValidationError):
+            asset.full_clean()
+
+    def test_only_one_hardware_type(self):
+        self.asset1.module_type = self.module_type1
+        with self.assertRaises(ValidationError):
+            self.asset1.full_clean()
 
     @override_settings(PLUGINS_CONFIG=CONFIG_SYNC_ON)
     def test_update_hardware_used_on(self):
@@ -86,7 +96,7 @@ class TestAssetModel(TestCase):
         with self.assertRaises(AbortRequest):
             self.device1.save()
 
-        # assign defferent device
+        # assign different device
         self.assertEqual(self.asset1.device, self.device1)
         self.asset1.snapshot()
         self.asset1.device = self.device2
@@ -121,7 +131,7 @@ class TestAssetModel(TestCase):
         self.assertEqual(self.device1.serial, '')
         self.assertEqual(self.device1.asset_tag, None)
 
-        # update asset serial updates device serial
+        # update asset serial does not update device serial
         self.asset1.snapshot()
         self.asset1.serial = 'changed'
         self.asset1.full_clean()
@@ -136,7 +146,7 @@ class TestAssetModel(TestCase):
         self.device1.refresh_from_db()
         self.assertEqual(self.device1.serial, 'allowed')
 
-        # assign defferent device
+        # assign different device
         self.assertEqual(self.asset1.device, self.device1)
         self.asset1.snapshot()
         self.asset1.device = self.device2
@@ -183,32 +193,3 @@ class TestAssetModel(TestCase):
         self.device1.delete()
         self.asset1.refresh_from_db()
         self.assertEqual(self.asset1.status, 'stored')
-
-    def test_purchase_delivery_missmatch(self):
-        self.asset1.snapshot()
-        self.asset1.purchase = self.purchase2
-        self.asset1.delivery = self.delivery1
-        with self.assertRaises(ValidationError):
-            self.asset1.full_clean()
-
-    def test_purchase_delivery_empty(self):
-        self.asset1.snapshot()
-        self.asset1.purchase = None
-        self.asset1.delivery = self.delivery1
-        with self.assertRaises(ValidationError):
-            self.asset1.full_clean()
-
-    def test_change_delivery_purchse(self):
-        """
-        Test that when delivery.purchase changes, asset.purchase is updated via signals
-        """
-        self.asset1.snapshot()
-        self.asset1.purchase = self.purchase1
-        self.asset1.delivery = self.delivery1
-        self.asset1.full_clean()
-        self.asset1.save()
-        self.delivery1.purchase = self.purchase2
-        self.delivery1.full_clean()
-        self.delivery1.save()
-        self.asset1.refresh_from_db()
-        self.assertEqual(self.asset1.purchase, self.purchase2)

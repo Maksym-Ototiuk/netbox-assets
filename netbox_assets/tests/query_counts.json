@@ -1,0 +1,6 @@
+{
+  "asset:api_list_objects": 14,
+  "asset:list_objects_with_permission": 20,
+  "assetrole:api_list_objects": 12,
+  "assetrole:list_objects_with_permission": 17
+}

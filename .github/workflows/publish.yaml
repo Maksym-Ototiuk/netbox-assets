@@ -6,15 +6,18 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Validate version strings match
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@main
+        uses: actions/checkout@v6
       - name: Setup Python
-        uses: actions/setup-python@main
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Check versions
@@ -23,16 +26,17 @@ jobs:
   publish:
     name: Publish to PyPI
     needs: validate
-    if: github.repository == 'ArnesSI/netbox-inventory'
+    if: github.repository == 'Maksym-Ototiuk/netbox-assets'
     runs-on: ubuntu-latest
-    environment: release
+    # must match the environment name in the PyPI trusted publisher settings
+    environment: pypi
     permissions:
       id-token: write
     steps:
       - name: Checkout repo
-        uses: actions/checkout@main
+        uses: actions/checkout@v6
       - name: Setup Python
-        uses: actions/setup-python@main
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install dependencies
@@ -49,13 +53,13 @@ jobs:
   create-release:
     name: Create GitHub Release
     needs: publish
-    if: github.repository == 'ArnesSI/netbox-inventory'
+    if: github.repository == 'Maksym-Ototiuk/netbox-assets'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout repo
-        uses: actions/checkout@main
+        uses: actions/checkout@v6
       - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

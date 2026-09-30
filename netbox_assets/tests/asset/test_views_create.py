@@ -1,10 +1,10 @@
 from django.test import override_settings
+from django.urls import reverse
 
 from dcim.models import (
     Device,
     DeviceRole,
     DeviceType,
-    InventoryItem,
     Manufacturer,
     Module,
     ModuleBay,
@@ -15,14 +15,14 @@ from dcim.models import (
 )
 from utilities.testing import ViewTestCases
 
-from ..settings import CONFIG_SYNC_ON
-from netbox_assets.models import Asset, InventoryItemType
+from netbox_assets.models import Asset
 from netbox_assets.tests.custom import ModelViewTestCase
+from netbox_assets.tests.settings import CONFIG_SYNC_ON
 
 
 class AssetCreateHwBase:
     """
-    Base class for tests that create hardware and assign Asset to it
+    Base class for tests that create hardware from an Asset ("Create Device" etc.)
     """
 
     def setUp(self):
@@ -45,15 +45,11 @@ class AssetCreateHwBase:
             model='module_type1',
         )
         self.role1 = DeviceRole.objects.create(name='role1', slug='role1')
-        self.inventoryitem_type1 = InventoryItemType.objects.create(
-            manufacturer=self.manufacturer1,
-            model='inventoryitem_type1',
-            slug='inventoryitem_type1',
-        )
         self.rack_type1 = RackType.objects.create(
             manufacturer=self.manufacturer1,
             model='rack_type1',
             slug='rack_type1',
+            form_factor='4-post-cabinet',
         )
         self.device1 = Device.objects.create(
             site=self.site1,
@@ -78,12 +74,6 @@ class AssetCreateHwBase:
             status='stored',
             module_type=self.module_type1,
         )
-        self.asset_inventoryitem_sn = Asset.objects.create(
-            asset_tag='asset_inventoryitem',
-            serial='asset_inventoryitem',
-            status='stored',
-            inventoryitem_type=self.inventoryitem_type1,
-        )
         self.asset_rack_sn = Asset.objects.create(
             asset_tag='asset_rack',
             serial='asset_rack',
@@ -98,48 +88,37 @@ class AssetCreateHwBase:
             status='stored',
             module_type=self.module_type1,
         )
-        self.asset_inventoryitem_no = Asset.objects.create(
-            status='stored',
-            inventoryitem_type=self.inventoryitem_type1,
-        )
         self.asset_rack_no = Asset.objects.create(
             status='stored',
             rack_type=self.rack_type1,
         )
 
     def _get_url(self, _):
-        hardware_kind = self.tested_asset.kind
-        if hardware_kind == 'inventoryitem':
-            hardware_kind = 'inventory-item'
-        return f'/plugins/inventory/assets/{hardware_kind}/create/?asset_id={self.tested_asset.pk}'
+        kind = self.tested_asset.kind
+        url = reverse(f'plugins:netbox_assets:asset_{kind}_create')
+        return f'{url}?asset_id={self.tested_asset.pk}'
+
+    def _check_created_hardware(self):
+        # the new hardware gets the asset's serial and asset tag, and the asset
+        # is assigned to it. Blank Asset.serial is None, blank hardware serial is ''
+        checked_serial = self.tested_asset.serial or ''
+        instance = self._get_queryset().order_by('pk').last()
+        self.assertEqual(instance.asset_tag, self.tested_asset.asset_tag)
+        self.assertEqual(instance.serial, checked_serial)
+        self.tested_asset.refresh_from_db()
+        self.assertEqual(instance, self.tested_asset.hardware)
 
     @override_settings(EXEMPT_VIEW_PERMISSIONS=['*'])
     @override_settings(PLUGINS_CONFIG=CONFIG_SYNC_ON)
     def test_create_object_with_permission(self):
         super().test_create_object_with_permission()
-        # in addition to a new inventoryitem instance in db,
-        # it must have matching serial and asset2 must have it assigned
-        # blank value for Asset.serial is None, but for Device/Module/IItem.serial it's ''
-        checked_serial = self.tested_asset.serial or ''
-        instance = self._get_queryset().order_by('pk').last()
-        self.assertEqual(instance.asset_tag, self.tested_asset.asset_tag)
-        self.assertEqual(instance.serial, checked_serial)
-        self.tested_asset.refresh_from_db()
-        self.assertEqual(instance, self.tested_asset.hardware)
+        self._check_created_hardware()
 
     @override_settings(EXEMPT_VIEW_PERMISSIONS=['*'])
     @override_settings(PLUGINS_CONFIG=CONFIG_SYNC_ON)
     def test_create_object_with_constrained_permission(self):
         super().test_create_object_with_constrained_permission()
-        # in addition to a new inventoryitem instance in db,
-        # it must have matching serial and asset2 must have it assigned
-        # blank value for Asset.serial is None, but for Device/Module/IItem.serial it's ''
-        checked_serial = self.tested_asset.serial or ''
-        instance = self._get_queryset().order_by('pk').last()
-        self.assertEqual(instance.asset_tag, self.tested_asset.asset_tag)
-        self.assertEqual(instance.serial, checked_serial)
-        self.tested_asset.refresh_from_db()
-        self.assertEqual(instance, self.tested_asset.hardware)
+        self._check_created_hardware()
 
 
 class SerialDeviceAssetCreateHwTestCase(
@@ -181,25 +160,6 @@ class SerialModuleAssetCreateHwTestCase(
             'status': 'active',
         }
         self.tested_asset = self.asset_module_sn
-
-
-class SerialInventoryItemAssetCreateHwTestCase(
-    AssetCreateHwBase, ModelViewTestCase, ViewTestCases.CreateObjectViewTestCase
-):
-    """
-    Test creating new InventoryItem from Asset with serial
-    """
-
-    model = InventoryItem
-
-    def setUp(self):
-        super().setUp()
-        self.form_data = {
-            'device': self.device1.pk,
-            'name': 'inventoryitem1',
-            'status': 'active',
-        }
-        self.tested_asset = self.asset_inventoryitem_sn
 
 
 class SerialRackAssetCreateHwTestCase(
@@ -261,25 +221,6 @@ class NoSerialModuleAssetCreateHwTestCase(
             'status': 'active',
         }
         self.tested_asset = self.asset_module_no
-
-
-class NoSerialInventoryItemAssetCreateHwTestCase(
-    AssetCreateHwBase, ModelViewTestCase, ViewTestCases.CreateObjectViewTestCase
-):
-    """
-    Test creating new InventoryItem from Asset with blank serial
-    """
-
-    model = InventoryItem
-
-    def setUp(self):
-        super().setUp()
-        self.form_data = {
-            'device': self.device1.pk,
-            'name': 'inventoryitem1',
-            'status': 'active',
-        }
-        self.tested_asset = self.asset_inventoryitem_no
 
 
 class NoSerialRackAssetCreateHwTestCase(

@@ -4,13 +4,16 @@ on:
   - push
   - pull_request
 
+permissions:
+  contents: read
+
 jobs:
   test-netbox:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        netbox-version: ["v4.7.1"]
+        netbox-version: ["v4.7.2"]
     services:
       redis:
         image: redis
@@ -31,12 +34,12 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@main
+        uses: actions/checkout@v6
         with:
-          path: netbox-inventory
+          path: netbox-assets
 
       - name: Set up Python
-        uses: actions/setup-python@main
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -47,15 +50,15 @@ jobs:
           ref: ${{ matrix.netbox-version }}
           path: netbox
 
-      - name: install netbox_inventory
-        working-directory: netbox-inventory
+      - name: Install netbox_assets
+        working-directory: netbox-assets
         run: |
           pip install .
 
       - name: Install dependencies & set up configuration
         working-directory: netbox
         run: |
-          ln -s $(pwd)/../netbox-inventory/testing/configuration_testing.py netbox/netbox/configuration.py
+          ln -s $(pwd)/../netbox-assets/testing/configuration_testing.py netbox/netbox/configuration.py
           python -m pip install --upgrade pip
           python -m pip install tblib
           pip install -r requirements.txt -U
@@ -67,4 +70,4 @@ jobs:
       - name: Run tests
         working-directory: netbox
         run: |
-          python netbox/manage.py test netbox_inventory.tests --parallel -v 2
+          python netbox/manage.py test netbox_assets.tests --parallel -v 2

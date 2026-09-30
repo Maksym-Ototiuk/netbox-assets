@@ -1,0 +1,38 @@
+---
+# Manual rehearsal: builds the package from the selected branch or tag and
+# uploads it to TestPyPI. Run it from the Actions tab ("Run workflow").
+name: Publish Python package to TestPyPI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-testpypi:
+    name: Publish to TestPyPI
+    if: github.repository == 'Maksym-Ototiuk/netbox-assets'
+    runs-on: ubuntu-latest
+    # must match the environment name in the TestPyPI trusted publisher settings
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install 'build[virtualenv]'
+      - name: Build package
+        run: python -m build
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true

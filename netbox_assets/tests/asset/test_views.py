@@ -5,41 +5,23 @@ from dcim.models import Device, DeviceRole, DeviceType, Manufacturer, Site
 from users.models import ObjectPermission
 from utilities.testing import ViewTestCases, post_data
 
-from ..settings import CONFIG_ALLOW_CREATE_DEVICE_TYPE
-from netbox_assets.models import Asset, Delivery, Purchase, Supplier
+from netbox_assets.models import Asset
 from netbox_assets.tests.custom import ModelViewTestCase
+from netbox_assets.tests.settings import CONFIG_ALLOW_CREATE_DEVICE_TYPE
 
 
 class AssetTestCase(
     ModelViewTestCase,
     ViewTestCases.PrimaryObjectViewTestCase,
 ):
+    """
+    UI view tests for assets
+    """
+
     model = Asset
 
     @classmethod
     def setUpTestData(cls):
-        supplier1 = Supplier.objects.create(
-            name='Supplier1',
-            slug='supplier1',
-        )
-        purchase1 = Purchase.objects.create(
-            name='Purchase1',
-            supplier=supplier1,
-            status='closed',
-        )
-        purchase2 = Purchase.objects.create(
-            name='Purchase2',
-            supplier=supplier1,
-            status='closed',
-        )
-        Delivery.objects.create(
-            name='the_delivery',
-            purchase=purchase1,
-        )
-        Delivery.objects.create(
-            name='the_delivery',
-            purchase=purchase2,
-        )
         Site.objects.create(
             name='site1',
             slug='site1',
@@ -82,10 +64,10 @@ class AssetTestCase(
             'device_type': device_type1.pk,
         }
         cls.csv_data = (
-            'serial,status,hardware_kind,manufacturer,model_name,supplier,purchase,delivery',
-            'csv1,stored,device,manufacturer1,device_type1,Supplier1,Purchase1,the_delivery',
-            'csv2,stored,device,manufacturer1,device_type1,Supplier1,Purchase1,the_delivery',
-            'csv3,stored,device,manufacturer_csv,device_type_csv,,,',
+            'serial,status,hardware_kind,manufacturer,model_name',
+            'csv1,stored,device,manufacturer1,device_type1',
+            'csv2,stored,device,manufacturer1,device_type1',
+            'csv3,stored,device,manufacturer_csv,device_type_csv',
         )
         cls.csv_update_data = (
             'id,serial,status',
@@ -99,7 +81,9 @@ class AssetTestCase(
 
     @override_settings(EXEMPT_VIEW_PERMISSIONS=['*'])
     def test_assign_device_from_asset(self):
-        # Assign unconstrained permission
+        """
+        "Edit Assignment" on the asset page assigns an existing device
+        """
         obj_perm = ObjectPermission(
             name='test-device-assign permission', actions=['add', 'change']
         )
@@ -133,9 +117,10 @@ class AssetTestCase(
         }
         self.assertHttpStatus(self.client.post(**request), 302)
 
-        devices = Device.objects.filter(name=device.name)
-        self.assertEqual(len(devices), 1)
-        self.assertEqual(devices.first().assigned_asset, asset)
+        device.refresh_from_db()
+        self.assertEqual(device.assigned_asset, asset)
+        asset.refresh_from_db()
+        self.assertEqual(asset.status, 'used')
 
     @override_settings(PLUGINS_CONFIG=CONFIG_ALLOW_CREATE_DEVICE_TYPE)
     def test_bulk_import_objects_with_permission(self):
@@ -145,57 +130,13 @@ class AssetTestCase(
     def test_bulk_import_objects_with_constrained_permission(self):
         return super().test_bulk_import_objects_with_constrained_permission()
 
-    @override_settings(EXEMPT_VIEW_PERMISSIONS=['*'])
-    def test_purchase_delivery_autoset(self):
-        """
-        check that assigning delivery without purchase auto-sets purchase
-        """
-        # Assign unconstrained permission
-        obj_perm = ObjectPermission(
-            name='test-asset permission', actions=['add', 'change']
-        )
-        obj_perm.save()
-        obj_perm.users.add(self.user)
-        obj_perm.object_types.add(ObjectType.objects.get_for_model(self.model))
-
-        supplier1 = Supplier.objects.create(
-            name='Supplier1-autoset',
-            slug='supplier1-autoset',
-        )
-        purchase1 = Purchase.objects.create(
-            name='Purchase1-autoset',
-            supplier=supplier1,
-            status='closed',
-        )
-        delivery1 = Delivery.objects.create(
-            name='Delivery1-autoset',
-            purchase=purchase1,
-        )
-
-        form_data = {
-            'status': 'stored',
-            'serial': '123delivery',
-            'device_type': DeviceType.objects.first(),
-            'delivery': delivery1.pk,
-        }
-
-        request = {
-            'path': self._get_url('add'),
-            'data': post_data(form_data),
-        }
-        self.assertHttpStatus(self.client.post(**request), 302)
-
-        assets = Asset.objects.filter(serial='123delivery')
-        self.assertEqual(len(assets), 1)
-        self.assertEqual(assets.first().purchase, purchase1)
-
 
 class AssetBulkAddTestCase(
     ModelViewTestCase,
     ViewTestCases.CreateMultipleObjectsViewTestCase,
 ):
     """
-    test for /plugins/inventory/assets/bulk-add/
+    Tests for /plugins/assets/assets/bulk-add/
     """
 
     model = Asset
@@ -220,10 +161,16 @@ class AssetBulkAddTestCase(
         }
 
     def _get_url(self, action, instance=None):
-        # fix - CreateMultipleObjectsViewTestCase assumes view names contains only 'add' but we need 'bulk_add'
+        # CreateMultipleObjectsViewTestCase uses the 'add' view, the plugin uses 'bulk_add'
         if action == 'add':
             action = 'bulk_add'
         return super()._get_url(action, instance)
+
+    def test_create_multiple_objects_addanother(self):
+        # NetBox 4.7.2+ treats device_type/module_type as the parent object of
+        # device components. For assets it is an ordinary field, so the check
+        # does not apply.
+        self.skipTest('device_type is not a parent object for assets')
 
     def test_bulk_create_objects_with_asset_tag_pattern(self):
         obj_perm = ObjectPermission(name='test-asset-bulk-add-pattern', actions=['add'])
@@ -244,6 +191,8 @@ class AssetBulkAddTestCase(
         self.assertHttpStatus(self.client.post(**request), 302)
 
         self.assertEqual(
-            list(Asset.objects.order_by('asset_tag').values_list('asset_tag', flat=True)),
+            list(
+                Asset.objects.order_by('asset_tag').values_list('asset_tag', flat=True)
+            ),
             ['ASSET-1', 'ASSET-2', 'ASSET-3'],
         )

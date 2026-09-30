@@ -84,6 +84,26 @@ hierarchical paths could not be restored from a database dump in that release
   Site, Location, Rack, Tenant, Contact and Manufacturer pages.
 - Global search, REST API and GraphQL API.
 
+## Usage
+
+1. **Create an asset.** In *Assets → Assets*, click *Add* and choose the
+   hardware type (a device type, module type or rack type). Fill in the serial
+   number, asset tag, storage location and so on. This form describes *what*
+   the hardware is. It does not link the asset to a particular device.
+2. **Assign the asset to hardware.** Use one of these buttons:
+   - *Edit Assignment* in the *Assigned To* panel on the asset page;
+   - *Edit Assignment* in the *Asset* panel on a device, module or rack page;
+   - *Create Device* (or *Create Module*, *Create Rack*) on the asset page, to
+     create the hardware and assign the asset in one step.
+
+   When an asset is assigned, its status changes to `used`. When it is
+   unassigned, its status changes to `stored` (see [Settings](#settings)).
+
+Assets are displayed as `<manufacturer> <model> <name>`, for example
+`Cisco ASR edge-01`, or as `<manufacturer> <model>` when the asset has no
+name. Unnamed assets of the same model look the same in lists and selection
+fields, so give assets a name if you need to tell them apart.
+
 ## Installation
 
 Activate the NetBox virtual environment and install the package:
@@ -181,6 +201,29 @@ REST API endpoints:
 | `/api/plugins/assets/dcim/modules/`     | NetBox modules with an extra `has_asset_assigned` filter |
 
 GraphQL queries: `asset`, `asset_list`, `asset_role`, `asset_role_list`.
+
+## Development
+
+The tests use the NetBox test framework. They need a NetBox 4.7 installation
+with PostgreSQL and Redis, and a database user that is allowed to create the
+test database. Install the plugin into the NetBox virtual environment in
+editable mode (`pip install -e .`) and run:
+
+```shell
+cd /opt/netbox/netbox
+python3 manage.py test netbox_assets.tests --keepdb --parallel 4
+```
+
+NetBox compares the number of database queries of list views with
+`netbox_assets/tests/query_counts.json`. If you change a list view or an API
+serializer on purpose, update the file (this does not work with `--parallel`):
+
+```shell
+UPDATE_QUERY_COUNTS=1 python3 manage.py test netbox_assets.tests --keepdb
+```
+
+GitHub Actions run `ruff` and the test suite against NetBox 4.7.1 and 4.7.2
+on every push and pull request.
 
 ## License
 
