@@ -38,16 +38,44 @@ class AssetReassignMixin(forms.Form):
         label='Status',
         help_text='Status to set to existing asset that is being unassigned',
     )
+    old_storage_site = DynamicModelChoiceField(
+        queryset=Site.objects.all(),
+        required=False,
+        label='Storage site for old Asset',
+        help_text='Limit Storage location choices for old Asset to this site',
+    )
+    old_storage_location = DynamicModelChoiceField(
+        queryset=Location.objects.all(),
+        required=False,
+        query_params={
+            'site_id': '$old_storage_site',
+        },
+        label='Storage location for old Asset',
+        help_text='Where the old Asset will be stored. Prefilled with the current '
+        'location of the hardware. Leave empty to save without a location',
+    )
 
     fieldsets = (
         FieldSet(
             'storage_site', 'storage_location', 'assigned_asset', name=_('New Asset')
         ),
-        FieldSet('asset_status', name=_('Old Asset')),
+        FieldSet(
+            'old_storage_site',
+            'old_storage_location',
+            'asset_status',
+            name=_('Old Asset'),
+        ),
     )
 
     class Meta:
-        fields = ('storage_site', 'storage_location', 'assigned_asset', 'asset_status')
+        fields = (
+            'storage_site',
+            'storage_location',
+            'assigned_asset',
+            'old_storage_site',
+            'old_storage_location',
+            'asset_status',
+        )
 
     def save(self, commit=True):
         # if existing assigned_asset, clear assignment before save
@@ -91,19 +119,41 @@ class AssetReassignMixin(forms.Form):
             raise ValidationError(
                 'Cannot reasign the same asset as is already assigned'
             )
+        old_storage_site = self.cleaned_data.get('old_storage_site')
+        old_storage_location = self.cleaned_data.get('old_storage_location')
+        # the location dropdown is filtered by site only in the browser,
+        # so check that the location belongs to the site here as well
+        if (
+            old_storage_site
+            and old_storage_location
+            and old_storage_location.site_id != old_storage_site.pk
+        ):
+            raise ValidationError(
+                {
+                    'old_storage_location': 'Storage location for old Asset must '
+                    'belong to Storage site for old Asset'
+                }
+            )
         # set device/module for asset and clean/validate
         if self.old_asset:
-            self._clean_asset(self.old_asset, None)
+            # empty location means the old asset is stored without a location
+            self._clean_asset(
+                self.old_asset, None, storage_location=old_storage_location
+            )
         if self.new_asset:
             self._clean_asset(self.new_asset, self.instance)
         return cleaned_data
 
-    def _clean_asset(self, asset, instance):
+    def _clean_asset(self, asset, instance, **changes):
         # store old state of asset objects for changelog
+        # (must be done before any field of the asset is changed)
         asset.snapshot()
         try:
             # update hardware assignment and validate data
             setattr(asset, asset.kind, instance)
+            # other field changes, e.g. storage_location for the old asset
+            for field_name, value in changes.items():
+                setattr(asset, field_name, value)
             # signal to assset.clean() methods to not validate _type match beetween asset and hw
             asset._in_reassign = True
             asset.full_clean(exclude=(asset.kind,))
@@ -125,12 +175,23 @@ class AssetReassignMixin(forms.Form):
         self.custom_fields_groups = {}
 
         try:
-            self.instance.assigned_asset
+            old_asset = self.instance.assigned_asset
         except Asset.DoesNotExist:
-            # no asset currently assigned, hide status field for old asset
+            # no asset currently assigned, hide fields for old asset
             self.fields.pop('asset_status')
+            self.fields.pop('old_storage_site')
+            self.fields.pop('old_storage_location')
             self.fieldsets = (self.fieldsets[0],)
-
+        else:
+            # prefill storage of old asset with the place where the hardware
+            # is installed now, so it stays there if the user changes nothing
+            # (values from the URL query string take precedence)
+            site = old_asset.installed_site
+            location = old_asset.installed_location
+            self.initial.setdefault('old_storage_site', site.pk if site else None)
+            self.initial.setdefault(
+                'old_storage_location', location.pk if location else None
+            )
 
 class AssetDeviceReassignForm(AssetReassignMixin, NetBoxModelForm):
     assigned_asset = DynamicModelChoiceField(
