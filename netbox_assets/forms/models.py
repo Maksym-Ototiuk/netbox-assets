@@ -180,15 +180,13 @@ class AssetForm(PrimaryModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Used for picking the default active tab for hardware type selection
-        self.no_hardware_type = True
-        if self.instance:
-            if (
-                self.instance.device_type
-                or self.instance.module_type
-                or self.instance.rack_type
-            ):
-                self.no_hardware_type = False
+        # Used for picking the default active tab for hardware type selection.
+        # Check initial data (not instance) so cloned assets, which pass the
+        # hardware type via GET params, get the right tab too.
+        self.no_hardware_type = not any(
+            self.initial.get(f'{kind}_type')
+            for kind in HardwareKindChoices.values()
+        )
 
         # if assigned to device/module/... we can't change device_type/...
         if self.instance.device or self.instance.module or self.instance.rack:
