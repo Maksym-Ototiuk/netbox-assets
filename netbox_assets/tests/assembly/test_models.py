@@ -410,7 +410,7 @@ class AssemblyModelTestCase(AssemblyFixtures, TestCase):
             module.save()
 
     def test_protect_module_type(self):
-        self.dac_type.attribute_data = {'side': 'A', 'media': 'DAC passive'}
+        self.dac_type.attribute_data = {'side': 'A', 'cable_type': 'dac-passive', 'length': 1}
         with self.assertRaisesMessage(AbortRequest, 'used by cable assemblies'):
             self.dac_type.save()
         self.dac_type.refresh_from_db()
@@ -424,7 +424,7 @@ class AssemblyModelTestCase(AssemblyFixtures, TestCase):
             module_type=self.plain_module_type, module=module, status='used'
         )
         self.plain_module_type.profile = self.dac_profile
-        self.plain_module_type.attribute_data = {'side': 'both', 'media': 'DAC passive'}
+        self.plain_module_type.attribute_data = {'side': 'both', 'cable_type': 'dac-passive'}
         with self.assertRaisesMessage(AbortRequest, 'are assigned to modules'):
             self.plain_module_type.save()
 

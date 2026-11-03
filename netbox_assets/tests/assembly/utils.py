@@ -36,13 +36,14 @@ DAC_SCHEMA = {
             'enum': [1],
             'default': 1,
         },
-        'media': {
+        'cable_type': {
             'type': 'string',
-            'title': 'Media',
-            'enum': ['DAC passive', 'DAC active'],
+            'title': 'Cable type',
+            'enum': ['dac-passive', 'dac-active'],
         },
+        'length': {'type': 'number', 'title': 'Length (m)', 'minimum': 0},
     },
-    'required': ['side', 'media'],
+    'required': ['side', 'cable_type'],
 }
 
 # Breakout 1 -> 4: separate module types for side A and side B, default names
@@ -62,7 +63,8 @@ BREAKOUT_SCHEMA = {
             'enum': [4],
             'default': 4,
         },
-        'media': {'type': 'string', 'title': 'Media'},
+        'cable_type': {'type': 'string', 'title': 'Cable type'},
+        'length': {'type': 'number', 'title': 'Length (m)', 'minimum': 0},
     },
     'required': ['side'],
 }
@@ -90,7 +92,7 @@ class AssemblyFixtures:
             'DAC-1M', cls.dac_profile, 'both', '10gbase-x-sfpp'
         )
         cls.breakout_a_type = cls.create_module_type(
-            'BRK-1M-A', cls.breakout_profile, 'A', '40gbase-x-qsfpp'
+            'BRK-1M-A', cls.breakout_profile, 'A', '40gbase-x-qsfpp', channels=4
         )
         cls.breakout_b_type = cls.create_module_type(
             'BRK-1M-B', cls.breakout_profile, 'B', '10gbase-x-sfpp'
@@ -108,16 +110,28 @@ class AssemblyFixtures:
         cls.device2 = cls.create_device('switch2')
 
     @classmethod
-    def create_module_type(cls, model, profile, side, interface_type):
+    def create_module_type(cls, model, profile, side, interface_type, channels=None):
         module_type = ModuleType.objects.create(
             manufacturer=cls.manufacturer,
             model=model,
             profile=profile,
-            attribute_data={'side': side, 'media': 'DAC passive'},
+            attribute_data={'side': side, 'cable_type': 'dac-passive', 'length': 1},
         )
-        InterfaceTemplate.objects.create(
-            module_type=module_type, name='Port {module}', type=interface_type
+        parent = InterfaceTemplate.objects.create(
+            module_type=module_type,
+            name='Port {module}',
+            type=interface_type,
+            channels=channels,
         )
+        # channel subinterfaces of a channelized (breakout) interface
+        for channel in range(1, (channels or 0) + 1):
+            InterfaceTemplate.objects.create(
+                module_type=module_type,
+                name=f'Port {{module}}:{channel}',
+                type='10gbase-x-sfpp',
+                parent=parent,
+                channel_id=channel,
+            )
         return module_type
 
     @classmethod
