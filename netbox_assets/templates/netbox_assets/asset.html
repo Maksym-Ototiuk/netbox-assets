@@ -84,6 +84,12 @@
         <h5 class="card-header">
           Assigned To
           <div class="card-actions">
+            {% if object.is_assembly %}
+              {# a cable assembly is installed through its ends, see the Assembly Ends panel #}
+              <a href="#assembly-ends" class="btn btn-sm btn-ghost-orange">
+                <i class="mdi mdi-vector-link" aria-hidden="true"></i> Assembly Ends
+              </a>
+            {% else %}
             {# only show create button if user has add permissions for the kind of hardware being created #}
             {# django templates don't support parenthesis in if statements, but and has priority over or #}
             {% if object.kind == 'device' and perms.dcim.add_device or object.kind == 'module' and perms.dcim.add_module or object.kind == 'rack' and perms.dcim.add_rack %}
@@ -102,6 +108,7 @@
               <a href="{% url 'plugins:netbox_assets:asset_assign' object.pk %}?return_url={{ object.get_absolute_url }}" class="btn btn-sm btn-ghost-orange">
                 <i class="mdi mdi-vector-link" aria-hidden="true"></i> Edit Assignment
               </a>
+            {% endif %}
             {% endif %}
           </div>
         </h5>
@@ -124,10 +131,17 @@
               {{ object.contact|linkify|placeholder }}
             </td>
           </tr>
-          <tr>
-            <th scope="row">{{ object.get_kind_display }}</th>
-            <td>{{ object.hardware|linkify|placeholder }}</td>
-          </tr>
+          {% if object.is_assembly %}
+            <tr>
+              <th scope="row">Primary End</th>
+              <td>{{ object.hardware|linkify|placeholder }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <th scope="row">{{ object.get_kind_display }}</th>
+              <td>{{ object.hardware|linkify|placeholder }}</td>
+            </tr>
+          {% endif %}
         </table>
       </div>
       <div class="card">
@@ -179,6 +193,13 @@
       {% plugin_right_page object %}
     </div>
   </div>
+  {% if object.is_assembly %}
+    <div class="row mb-3">
+      <div class="col col-md-12">
+        {% include 'netbox_assets/inc/asset_ends.html' %}
+      </div>
+    </div>
+  {% endif %}
   <div class="row mb-3">
     <div class="col col-md-12">
       {% plugin_full_width_page object %}

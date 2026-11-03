@@ -1,6 +1,6 @@
 from netbox.plugins import PluginTemplateExtension
 
-from .models import Asset
+from .models import Asset, AssetModuleEnd
 from .utils import query_located
 
 #
@@ -59,6 +59,27 @@ class DeviceAssetInfo(AssetInfoExtension):
 class ModuleAssetInfo(AssetInfoExtension):
     models = ['dcim.module']
     kind = 'module'
+
+    def left_page(self):
+        # a module can be an end of a cable assembly instead
+        object = self.context.get('object')
+        end = (
+            AssetModuleEnd.objects.filter(module=object)
+            .select_related('asset__module_type__profile')
+            .first()
+        )
+        if end is None:
+            return super().left_page()
+        asset = end.asset
+        other_ends = asset.get_ordered_ends(
+            asset.ends.exclude(pk=end.pk).select_related(
+                'module__device', 'module__module_bay'
+            )
+        )
+        context = {'end': end, 'asset': asset, 'other_ends': other_ends}
+        return self.render(
+            'netbox_assets/inc/asset_end_info.html', extra_context=context
+        )
 
 
 class RackAssetInfo(AssetInfoExtension):

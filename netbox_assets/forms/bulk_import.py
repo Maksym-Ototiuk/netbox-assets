@@ -2,8 +2,22 @@ from django import forms
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.text import slugify
 
-from dcim.models import DeviceType, Location, Manufacturer, ModuleType, RackType, Site
-from netbox.forms import NestedGroupModelImportForm, PrimaryModelImportForm
+from dcim.models import (
+    Device,
+    DeviceType,
+    Location,
+    Manufacturer,
+    Module,
+    ModuleBay,
+    ModuleType,
+    RackType,
+    Site,
+)
+from netbox.forms import (
+    NestedGroupModelImportForm,
+    NetBoxModelImportForm,
+    PrimaryModelImportForm,
+)
 from tenancy.models import Contact, Tenant
 from utilities.forms.fields import CSVChoiceField, CSVModelChoiceField
 
@@ -13,6 +27,7 @@ from ..utils import get_plugin_setting
 
 __all__ = (
     'AssetImportForm',
+    'AssetModuleEndImportForm',
     'AssetRoleImportForm',
 )
 
@@ -311,3 +326,57 @@ class AssetImportForm(PrimaryModelImportForm):
         except forms.ValidationError as e:
             self.add_error(field_name, e)
             raise
+
+
+#
+# Cable assembly ends
+#
+
+
+class AssetModuleEndImportForm(NetBoxModelImportForm):
+    asset = CSVModelChoiceField(
+        queryset=Asset.objects.all(),
+        to_field_name='id',
+        help_text='ID of the cable assembly asset.',
+    )
+    device = CSVModelChoiceField(
+        queryset=Device.objects.all(),
+        to_field_name='name',
+        help_text='Device in which the end is installed.',
+    )
+    module_bay = CSVModelChoiceField(
+        queryset=ModuleBay.objects.all(),
+        to_field_name='name',
+        help_text='Module bay of the device in which the end is installed. '
+        'A module must be installed in the bay.',
+    )
+
+    class Meta:
+        model = AssetModuleEnd
+        fields = ('asset', 'device', 'module_bay', 'label', 'is_primary', 'tags')
+
+    def __init__(self, data=None, *args, **kwargs):
+        super().__init__(data, *args, **kwargs)
+
+        if data:
+            # limit module_bay queryset to the selected device
+            params = {
+                f'device__{self.fields["device"].to_field_name}': data.get('device')
+            }
+            self.fields['module_bay'].queryset = self.fields[
+                'module_bay'
+            ].queryset.filter(**params)
+
+    def clean(self):
+        super().clean()
+        module_bay = self.cleaned_data.get('module_bay')
+        if module_bay is not None:
+            try:
+                self.instance.module = module_bay.installed_module
+            except Module.DoesNotExist:
+                raise forms.ValidationError(
+                    {
+                        'module_bay': f'No module is installed in module bay {module_bay}.'
+                    }
+                )
+        return self.cleaned_data

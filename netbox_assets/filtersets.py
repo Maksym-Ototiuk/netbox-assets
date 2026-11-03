@@ -10,6 +10,7 @@ from dcim.models import (
     DeviceType,
     Location,
     Module,
+    ModuleBay,
     ModuleType,
     Rack,
     RackRole,
@@ -26,12 +27,14 @@ from utilities import filters
 from utilities.filters import TreeNodeMultipleChoiceFilter
 from utilities.filtersets import register_filterset
 
+from .assembly import assembly_module_type_q
 from .choices import AssetStatusChoices, HardwareKindChoices
 from .models import *
 from .utils import get_asset_custom_fields_search_filters, query_located
 
 __all__ = (
     'AssetFilterSet',
+    'AssetModuleEndFilterSet',
     'AssetRoleFilterSet',
     'DeviceAssetFilterSet',
     'ModuleAssetFilterSet',
@@ -204,6 +207,10 @@ class AssetFilterSet(PrimaryModelFilterSet):
         method='filter_is_assigned',
         label='Is assigned to hardware',
     )
+    is_assembly = django_filters.BooleanFilter(
+        method='filter_is_assembly',
+        label='Is a cable assembly',
+    )
     tenant_id = django_filters.ModelMultipleChoiceFilter(
         queryset=Tenant.objects.all(),
         field_name='tenant',
@@ -333,6 +340,12 @@ class AssetFilterSet(PrimaryModelFilterSet):
             | Q(rack__name__icontains=value)
             | Q(tenant__name__icontains=value)
             | Q(owning_tenant__name__icontains=value)
+            # cable assemblies: device of any installed end
+            | Q(
+                pk__in=AssetModuleEnd.objects.filter(
+                    module__device__name__icontains=value
+                ).values('asset_id')
+            )
         )
         custom_field_filters = get_asset_custom_fields_search_filters()
         for custom_field_filter in custom_field_filters:
@@ -371,18 +384,26 @@ class AssetFilterSet(PrimaryModelFilterSet):
             return queryset.filter(q)
 
     def filter_is_assigned(self, queryset, name, value):
+        # a cable assembly is assigned if at least one end is installed
+        q_ends = Q(pk__in=AssetModuleEnd.objects.values('asset_id'))
         if value:
             # is assigned to any hardware
             return queryset.filter(
                 Q(device__isnull=False)
                 | Q(module__isnull=False)
                 | Q(rack__isnull=False)
+                | q_ends
             )
         else:
             # is not assigned to hardware kind
             return queryset.filter(
                 Q(device__isnull=True) & Q(module__isnull=True) & Q(rack__isnull=True)
-            )
+            ).exclude(q_ends)
+
+    def filter_is_assembly(self, queryset, name, value):
+        if value:
+            return queryset.filter(assembly_module_type_q())
+        return queryset.exclude(assembly_module_type_q())
 
     def filter_installed(self, queryset, name, value):
         return query_located(queryset, name, value, assets_shown='installed')
@@ -409,6 +430,73 @@ class AssetFilterSet(PrimaryModelFilterSet):
         return queryset.filter(q_list)
 
 
+#
+# Cable assembly ends
+#
+
+
+@register_filterset
+class AssetModuleEndFilterSet(NetBoxModelFilterSet):
+    asset_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='asset',
+        queryset=Asset.objects.all(),
+        label='Asset (ID)',
+    )
+    module_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='module',
+        queryset=Module.objects.all(),
+        label='Module (ID)',
+    )
+    module_type_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='module__module_type',
+        queryset=ModuleType.objects.all(),
+        label='Module type (ID)',
+    )
+    module_bay_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='module__module_bay',
+        queryset=ModuleBay.objects.all(),
+        label='Module bay (ID)',
+    )
+    device_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='module__device',
+        queryset=Device.objects.all(),
+        label='Device (ID)',
+    )
+    device = filters.MultiValueCharFilter(
+        field_name='module__device__name',
+        lookup_expr='iexact',
+        label='Device (name)',
+    )
+    site_id = django_filters.ModelMultipleChoiceFilter(
+        field_name='module__device__site',
+        queryset=Site.objects.all(),
+        label='Site (ID)',
+    )
+    label = filters.MultiValueCharFilter(
+        lookup_expr='iexact',
+        label='End',
+    )
+
+    class Meta:
+        model = AssetModuleEnd
+        fields = (
+            'id',
+            'label',
+            'is_primary',
+        )
+
+    def search(self, queryset, name, value):
+        if not value.strip():
+            return queryset
+        return queryset.filter(
+            Q(label__icontains=value)
+            | Q(asset__name__icontains=value)
+            | Q(asset__serial__icontains=value)
+            | Q(asset__asset_tag__icontains=value)
+            | Q(module__device__name__icontains=value)
+        )
+
+
 class HasAssetFilterMixin(NetBoxModelFilterSet):
     has_asset_assigned = django_filters.BooleanFilter(
         method='_has_asset_assigned',
@@ -427,4 +515,9 @@ class DeviceAssetFilterSet(HasAssetFilterMixin, DeviceFilterSet):
 
 
 class ModuleAssetFilterSet(HasAssetFilterMixin, ModuleFilterSet):
-    pass
+    def _has_asset_assigned(self, queryset, name, value):
+        # a module that is an end of a cable assembly has an asset as well
+        params = Q(assigned_asset__isnull=False) | Q(assembly_end__isnull=False)
+        if value:
+            return queryset.filter(params)
+        return queryset.exclude(params)

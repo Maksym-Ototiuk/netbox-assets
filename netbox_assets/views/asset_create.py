@@ -1,3 +1,6 @@
+from django.contrib import messages
+from django.shortcuts import redirect
+
 from dcim.models import Device, Module, Rack
 from netbox.views import generic
 
@@ -22,6 +25,9 @@ class AssetCreateView(generic.ObjectEditView):
 
     def dispatch(self, request, *args, **kwargs):
         self._load_asset(request)
+        if self.asset is not None and self.asset.is_assembly:
+            messages.info(request, 'A cable assembly is installed through its ends.')
+            return redirect(self.asset.get_absolute_url() + '#assembly-ends')
         return super().dispatch(request, *args, **kwargs)
 
     def alter_object(self, obj, request, url_args, url_kwargs):

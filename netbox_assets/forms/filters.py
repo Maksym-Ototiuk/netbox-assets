@@ -13,7 +13,11 @@ from dcim.models import (
     RackType,
     Site,
 )
-from netbox.forms import NestedGroupModelFilterSetForm, PrimaryModelFilterSetForm
+from netbox.forms import (
+    NestedGroupModelFilterSetForm,
+    NetBoxModelFilterSetForm,
+    PrimaryModelFilterSetForm,
+)
 from tenancy.models import Contact, ContactGroup, Tenant
 from utilities.forms import BOOLEAN_WITH_BLANK_CHOICES
 from utilities.forms.fields import DynamicModelMultipleChoiceField, TagFilterField
@@ -24,6 +28,7 @@ from ..models import *
 
 __all__ = (
     'AssetFilterForm',
+    'AssetModuleEndFilterForm',
     'AssetRoleFilterForm',
 )
 
@@ -94,6 +99,7 @@ class AssetFilterForm(PrimaryModelFilterSetForm):
             'rack_type_id',
             'rack_role_id',
             'is_assigned',
+            'is_assembly',
             name='Hardware',
         ),
         FieldSet(
@@ -192,6 +198,11 @@ class AssetFilterForm(PrimaryModelFilterSetForm):
         label='Is assigned to hardware',
         widget=forms.Select(choices=BOOLEAN_WITH_BLANK_CHOICES),
     )
+    is_assembly = forms.NullBooleanField(
+        required=False,
+        label='Is a cable assembly',
+        widget=forms.Select(choices=BOOLEAN_WITH_BLANK_CHOICES),
+    )
     tenant_id = DynamicModelMultipleChoiceField(
         queryset=Tenant.objects.all(),
         required=False,
@@ -284,5 +295,51 @@ class AssetFilterForm(PrimaryModelFilterSetForm):
         },
         label='Located at location',
         help_text='Currently installed or stored here',
+    )
+    tag = TagFilterField(model)
+
+
+#
+# Cable assembly ends
+#
+
+
+class AssetModuleEndFilterForm(NetBoxModelFilterSetForm):
+    model = AssetModuleEnd
+    fieldsets = (
+        FieldSet('q', 'filter_id', 'tag'),
+        FieldSet('asset_id', 'label', 'is_primary', name='Cable Assembly'),
+        FieldSet('site_id', 'device_id', 'module_type_id', name='Installed In'),
+    )
+    asset_id = DynamicModelMultipleChoiceField(
+        queryset=Asset.objects.all(),
+        required=False,
+        query_params={'is_assembly': True},
+        label='Cable assembly',
+    )
+    label = forms.CharField(
+        required=False,
+        label='End',
+    )
+    is_primary = forms.NullBooleanField(
+        required=False,
+        label='Primary',
+        widget=forms.Select(choices=BOOLEAN_WITH_BLANK_CHOICES),
+    )
+    site_id = DynamicModelMultipleChoiceField(
+        queryset=Site.objects.all(),
+        required=False,
+        label='Site',
+    )
+    device_id = DynamicModelMultipleChoiceField(
+        queryset=Device.objects.all(),
+        required=False,
+        query_params={'site_id': '$site_id'},
+        label='Device',
+    )
+    module_type_id = DynamicModelMultipleChoiceField(
+        queryset=ModuleType.objects.all(),
+        required=False,
+        label='Module type',
     )
     tag = TagFilterField(model)

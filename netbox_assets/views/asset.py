@@ -22,6 +22,51 @@ __all__ = (
 class AssetView(generic.ObjectView):
     queryset = models.Asset.objects.all()
 
+    def get_extra_context(self, request, instance):
+        if not instance.is_assembly:
+            return {}
+        return {'assembly_slots': self.get_assembly_slots(instance)}
+
+    @staticmethod
+    def get_assembly_slots(asset):
+        """
+        All ends (slots) of a cable assembly as defined by its profile, with the
+        installed end, its interfaces and their cables.
+        """
+        spec = asset.assembly_spec
+        if spec is None:
+            return []
+        ends = {
+            end.label: end
+            for end in asset.ends.select_related(
+                'module__device', 'module__module_bay', 'module__module_type'
+            ).prefetch_related('module__interfaces__cable')
+        }
+        slots = []
+        for slot in spec.slots:
+            end = ends.get(slot.label)
+            interfaces = []
+            cables = {}
+            if end is not None:
+                # channel subinterfaces share the cable of their parent
+                interfaces = [
+                    interface
+                    for interface in end.module.interfaces.all()
+                    if interface.channel_id is None
+                ]
+                for interface in interfaces:
+                    if interface.cable is not None:
+                        cables[interface.cable.pk] = interface.cable
+            slots.append(
+                {
+                    'slot': slot,
+                    'end': end,
+                    'interfaces': interfaces,
+                    'cables': list(cables.values()),
+                }
+            )
+        return slots
+
 
 @register_model_view(models.Asset, 'list', path='', detail=False)
 class AssetListView(generic.ObjectListView):
@@ -32,6 +77,10 @@ class AssetListView(generic.ObjectListView):
         'device__role',
         'module__module_bay',
         'module__module_type',
+        'module_type__profile',
+        'ends__module__device',
+        'ends__module__module_bay',
+        'ends__module__module_type',
         'rack__role',
         'role',
         'owning_tenant',

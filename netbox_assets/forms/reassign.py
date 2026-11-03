@@ -7,6 +7,7 @@ from netbox.forms import NetBoxModelForm
 from utilities.forms.fields import DynamicModelChoiceField
 from utilities.forms.rendering import FieldSet
 
+from ..assembly import assembly_module_type_q
 from ..choices import AssetStatusChoices
 from ..models import Asset
 from ..utils import get_status_for
@@ -214,13 +215,17 @@ class AssetDeviceReassignForm(AssetReassignMixin, NetBoxModelForm):
 
 
 class AssetModuleReassignForm(AssetReassignMixin, NetBoxModelForm):
+    # cable assemblies are installed through their ends, not assigned to modules
     assigned_asset = DynamicModelChoiceField(
-        queryset=Asset.objects.filter(module_type__isnull=False, module__isnull=True),
+        queryset=Asset.objects.filter(
+            module_type__isnull=False, module__isnull=True
+        ).exclude(assembly_module_type_q()),
         required=False,
         selector=True,
         query_params={
             'kind': 'module',
             'is_assigned': False,
+            'is_assembly': False,
             'storage_site_id': '$storage_site',
             'storage_location_id': '$storage_location',
         },

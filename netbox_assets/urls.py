@@ -49,6 +49,15 @@ urlpatterns = (
         views.AssetRackReassignView.as_view(),
         name='asset_rack_reassign',
     ),
+    # Cable assembly ends
+    path(
+        'assembly-ends/',
+        include(get_model_urls('netbox_assets', 'assetmoduleend', detail=False)),
+    ),
+    path(
+        'assembly-ends/<int:pk>/',
+        include(get_model_urls('netbox_assets', 'assetmoduleend')),
+    ),
     # Asset Roles
     path(
         'asset-roles/',

@@ -1,4 +1,5 @@
 import django_tables2 as tables
+from django.db.models import OuterRef, Subquery
 from django.db.models.functions import Coalesce
 from django.utils.translation import gettext_lazy as _
 
@@ -19,9 +20,22 @@ from utilities.tables import register_table_column
 from .models import *
 
 __all__ = (
+    'AssetModuleEndTable',
     'AssetRoleTable',
     'AssetTable',
 )
+
+
+def primary_end_value(field_name):
+    """
+    Subquery with a field of the primary end's module of a cable assembly, used
+    to sort cable assemblies by the place where they are installed.
+    """
+    return Subquery(
+        AssetModuleEnd.objects.filter(asset=OuterRef('pk'), is_primary=True).values(
+            f'module__{field_name}'
+        )[:1]
+    )
 
 
 #
@@ -148,6 +162,11 @@ class AssetTable(PrimaryModelTable):
     )
     actions = columns.ActionsColumn(
         extra_buttons="""
+            {% if record.is_assembly %}
+            <a href="{{ record.get_absolute_url }}#assembly-ends" class="btn btn-sm btn-orange" title="Install or uninstall cable assembly ends">
+                <i class="mdi mdi-vector-link"></i>
+            </a>
+            {% else %}
             {% if record.hardware %}
             <a href="#" class="btn btn-sm btn-outline-dark disabled">
                 <i class="mdi mdi-vector-difference-ba" aria-hidden="true"></i>
@@ -160,6 +179,7 @@ class AssetTable(PrimaryModelTable):
             <a href="{% url 'plugins:netbox_assets:asset_assign' record.pk %}" class="btn btn-sm btn-orange" title="Edit hardware assignment">
                 <i class="mdi mdi-vector-link"></i>
             </a>
+            {% endif %}
         """
     )
 
@@ -197,6 +217,7 @@ class AssetTable(PrimaryModelTable):
                 'device__name',
                 'module__device__name',
                 'rack__name',
+                primary_end_value('device__name'),
             )
         ).order_by(
             ('-' if is_descending else '') + 'hw',
@@ -223,18 +244,25 @@ class AssetTable(PrimaryModelTable):
                 'device__site__name',
                 'module__device__site__name',
                 'rack__site__name',
+                primary_end_value('device__site__name'),
             ),
             location_name=Coalesce(
                 'device__location__name',
                 'module__device__location__name',
                 'rack__location__name',
+                primary_end_value('device__location__name'),
             ),
             rack_name=Coalesce(
                 'device__rack__name',
                 'module__device__rack__name',
                 'rack__name',
+                primary_end_value('device__rack__name'),
             ),
-            device_name=Coalesce('device__name', 'module__device__name'),
+            device_name=Coalesce(
+                'device__name',
+                'module__device__name',
+                primary_end_value('device__name'),
+            ),
         )
 
     def order_installed_site(self, queryset, is_descending):
@@ -322,6 +350,86 @@ class AssetTable(PrimaryModelTable):
             'status',
             'hardware',
             'tags',
+        )
+
+
+#
+# Cable assembly ends
+#
+
+
+class AssetModuleEndTable(NetBoxTable):
+    label = tables.Column(
+        linkify=True,
+        verbose_name='End',
+    )
+    asset = tables.Column(
+        linkify=True,
+    )
+    asset_serial = tables.Column(
+        accessor='asset__serial',
+        verbose_name='Serial Number',
+    )
+    asset_tag = tables.Column(
+        accessor='asset__asset_tag',
+        verbose_name='Asset Tag',
+    )
+    side = tables.Column(
+        orderable=False,
+    )
+    is_primary = columns.BooleanColumn(
+        verbose_name='Primary',
+    )
+    device = tables.Column(
+        accessor='module__device',
+        linkify=True,
+    )
+    module_bay = tables.Column(
+        accessor='module__module_bay',
+        linkify=True,
+        verbose_name='Module Bay',
+    )
+    module = tables.Column(
+        linkify=True,
+    )
+    module_type = tables.Column(
+        accessor='module__module_type',
+        linkify=True,
+        verbose_name='Module Type',
+    )
+    tags = columns.TagColumn(
+        url_name='plugins:netbox_assets:assetmoduleend_list',
+    )
+
+    class Meta(NetBoxTable.Meta):
+        model = AssetModuleEnd
+        fields = (
+            'pk',
+            'id',
+            'asset',
+            'asset_serial',
+            'asset_tag',
+            'label',
+            'side',
+            'is_primary',
+            'device',
+            'module_bay',
+            'module',
+            'module_type',
+            'tags',
+            'created',
+            'last_updated',
+            'actions',
+        )
+        default_columns = (
+            'pk',
+            'asset',
+            'label',
+            'side',
+            'is_primary',
+            'device',
+            'module_bay',
+            'module_type',
         )
 
 

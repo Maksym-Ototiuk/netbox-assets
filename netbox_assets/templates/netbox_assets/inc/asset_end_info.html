@@ -1,0 +1,47 @@
+{% load helpers %}
+{# renders panel on a module that is an end of a cable assembly #}
+
+<div class="card">
+  <h5 class="card-header">
+    Cable Assembly
+    {% if perms.netbox_assets.view_asset %}
+      <div class="card-actions">
+        <a href="{{ asset.get_absolute_url }}#assembly-ends" class="btn btn-sm btn-ghost-orange">
+          <i class="mdi mdi-vector-link" aria-hidden="true"></i> Assembly Ends
+        </a>
+      </div>
+    {% endif %}
+  </h5>
+  <table class="table table-hover attr-table">
+    <tr>
+      <th scope="row"><span title="Asset name">Name</span></th>
+      <td><a href="{{ asset.get_absolute_url }}">{{ asset }}</a></td>
+    </tr>
+    <tr>
+      <th scope="row"><span title="Asset status">Status</span></th>
+      <td>{% badge asset.get_status_display bg_color=asset.get_status_color %}</td>
+    </tr>
+    <tr>
+      <th scope="row">End</th>
+      <td><a href="{{ end.get_absolute_url }}">{{ end.label }}</a> (side {{ end.side }})</td>
+    </tr>
+    <tr>
+      <th scope="row">Primary</th>
+      <td>{% checkmark end.is_primary %}</td>
+    </tr>
+    <tr>
+      <th scope="row">Other Ends</th>
+      <td>
+        {% for other in other_ends %}
+          <div>{{ other.label }}: {{ other.module.device|linkify }} / {{ other.module.module_bay|linkify }}</div>
+        {% empty %}
+          {{ ''|placeholder }}
+        {% endfor %}
+      </td>
+    </tr>
+    <tr>
+      <th scope="row">Owning tenant</th>
+      <td>{{ asset.owning_tenant|linkify|placeholder }}</td>
+    </tr>
+  </table>
+</div>
