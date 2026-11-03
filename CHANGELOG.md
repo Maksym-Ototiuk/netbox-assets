@@ -18,11 +18,18 @@ All notable changes to netbox-assets. The versions follow
   pages.
 - Status, primary end and serial / asset tag synchronization for cable
   assemblies.
+- The NetBox cable of a cable assembly is created, updated and deleted
+  automatically when ends are installed or uninstalled: type and length from
+  the module type (`cable_type`, `length`), cable profile from the topology
+  (`1C1P`, `1CNP:NC1P breakout`) or the profile key `x-cable-profile`. Only
+  label, description, color, status, tenancy, ownership, comments, tags and
+  custom fields of this cable can be changed by users.
 - Protection of module types, Module Type Profiles and modules used by cable
   assemblies.
-- REST API endpoint `/api/plugins/assets/assembly-ends/`, asset field and
-  filter `is_assembly`, GraphQL queries `assembly_end` and
-  `assembly_end_list` and the asset field `ends`.
+- REST API endpoint `/api/plugins/assets/assembly-ends/`, asset fields
+  `is_assembly` and `assembly_cable`, filter `is_assembly`, GraphQL queries
+  `assembly_end` and `assembly_end_list` and the asset fields `ends` and
+  `assembly_cable`.
 - [Cable assembly profiles](docs/cable-assembly-profiles.md): six
   ready-to-use profiles with module types and installation examples.
 

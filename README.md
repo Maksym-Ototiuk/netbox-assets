@@ -135,6 +135,10 @@ several modules, the **ends** of the cable assembly.
   assembly**. Its module type is the side `A` or `both` module type.
 - Installing an end links one end of the asset to a module (model
   `AssetModuleEnd`). A cable assembly is never assigned to a module directly.
+- When ends on both sides are installed, the plugin **creates the NetBox
+  cable** between their interfaces, with the cable type (`cable_type`) and the
+  length (`length`) of the module type. A breakout cable is one cable with
+  one side A and up to four side B terminations.
 
 Example profile for a breakout cable:
 
@@ -146,10 +150,10 @@ Example profile for a breakout cable:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["A", "B"]},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [4], "default": 4},
-    "media":  {"type": "string",  "title": "Media", "enum": ["DAC passive", "DAC active", "AOC"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active", "aoc"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
-  "required": ["side", "media"]
+  "required": ["side", "cable_type", "length"]
 }
 ```
 
@@ -162,9 +166,11 @@ and installation examples, and the rules for writing your own profiles.
 
 1. Create the profiles: *Devices → Module Type Profiles* (or import them from
    the [examples](docs/cable-assembly-profiles.md#import-all-profiles)).
-2. Create the module types with the profile and the attribute `side`: one
-   `both` module type for a symmetric assembly, or a side `A` and a side `B`
-   module type for a breakout cable. Add an interface template for the port.
+2. Create the module types with the profile and the attributes `side`,
+   `cable_type` and `length`: one `both` module type for a symmetric
+   assembly, or a side `A` and a side `B` module type for a breakout cable.
+   Add one interface template for the port (for a breakout QSFP end: a
+   channelized interface with its channel subinterfaces).
 3. Create the asset with the side `A` (or `both`) module type. It is
    `stored`.
 4. On the asset page, the **Assembly Ends** panel lists all ends of the
@@ -172,8 +178,8 @@ and installation examples, and the rules for writing your own profiles.
    bay. If a module is installed in the bay, it becomes the end; if the bay is
    empty, the plugin creates the module. **Uninstall** removes the end; the
    module stays in NetBox.
-5. Connect the interfaces of the ends with a NetBox cable (type DAC or AOC,
-   profile `1C1P`, or `1C4P:4C1P breakout` for a breakout cable).
+5. When ends on both sides are installed, the plugin creates the NetBox
+   cable, see [Cable](#cable).
 
 The panel shows for each end the device, module bay, module, its interfaces
 and the connected cable, and which end is the primary end. A module page
@@ -227,10 +233,46 @@ To keep existing cable assemblies valid, the plugin refuses:
 - **Deleted modules:** when the module of an end is deleted (or the device of
   the module), the end is removed and the status and primary end are updated.
 
-### Limitations
+### Cable
 
-- The plugin does not create or check NetBox cables. Connect the interfaces of
-  the ends yourself.
+The plugin keeps one NetBox cable per cable assembly (shown in the *Assembly
+Ends* panel and as `assembly_cable` in the API):
+
+- **Created** when at least one end on side A and one end on side B are
+  installed, between the interfaces of their modules (the only interface of
+  the module that is not a channel subinterface; for a breakout QSFP end, the
+  channelized interface).
+- **Type and length** come from the module type of the asset (`cable_type`, a
+  NetBox cable type such as `dac-passive`, and `length` in meters). The
+  status is `connected` and the label is the asset tag (or the name) when the
+  cable is created.
+- **Cable profile:** `1C1P` for 1 + 1 ends, `1CNP:NC1P breakout` for 1 + N
+  ends (or the profile key `x-cable-profile`). Side B ends are terminated in
+  the order of the slots, so NetBox traces each channel of a breakout cable
+  to its end. NetBox assigns connectors by the order of the terminations: if
+  the installed side B ends have a gap (B1 and B3 without B2), the cable has
+  no cable profile and the panel shows a warning, until the gap is closed.
+- **Updated** when an end is installed or uninstalled, and when `cable_type`,
+  `length` or the cable profile of the module type or profile change.
+  Uninstalling a side B end of a breakout cable removes only this end from
+  the cable.
+- **Deleted** when no end is left on one side: uninstalling the side A end, or
+  the last side B end, or the only other end of a DAC. The same happens when
+  the module or the device of an end is deleted.
+- When the asset is deleted, the cable stays as a normal NetBox cable.
+
+Only label, description, color, status, tenancy, ownership, comments, tags
+and custom fields of an assembly cable can be changed in NetBox. Its type,
+profile, length and terminations cannot be changed, and it cannot be deleted
+directly: install or uninstall the ends of the assembly instead.
+
+Installing an end is refused if the interface of the module already has
+another cable (delete it first), if the module does not have exactly one
+interface for the cable, or if the user is not allowed to add, change or
+delete cables (whatever installing or uninstalling the end does to the
+cable).
+
+### Limitations
 - Only modules can be ends. Module bay types are not checked by the plugin;
   use NetBox module bay types (NetBox 4.7) if ends must fit certain bays
   only.
@@ -337,14 +379,15 @@ REST API endpoints:
 | `/api/plugins/assets/dcim/devices/`     | NetBox devices with an extra `has_asset_assigned` filter |
 | `/api/plugins/assets/dcim/modules/`     | NetBox modules with an extra `has_asset_assigned` filter |
 
-Assets have the read-only field `is_assembly` and the filter
-`is_assembly=true|false`. An end is created with the `asset` and `module`
+Assets have the read-only fields `is_assembly` and `assembly_cable` (the
+cable of a cable assembly) and the filter `is_assembly=true|false`. An end is created with the `asset` and `module`
 IDs and the `label` of the end; if `label` is empty, the first free end that
 matches the module type is used. The read-only field `side` shows the side of
 the end.
 
 GraphQL queries: `asset`, `asset_list`, `asset_role`, `asset_role_list`,
-`assembly_end`, `assembly_end_list`. Assets have the field `ends`.
+`assembly_end`, `assembly_end_list`. Assets have the fields `ends` and
+`assembly_cable`.
 
 To import ends (*Assets → Assembly Ends → Import*), use the columns `asset`
 (asset ID), `device` (device name), `module_bay` (module bay name), and

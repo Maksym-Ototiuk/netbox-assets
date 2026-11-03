@@ -52,9 +52,9 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [both], default: both}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [1], default: 1}
-      media: {type: string, title: Media, enum: [DAC passive, DAC active]}
+      cable_type: {type: string, title: Cable type, enum: [dac-passive, dac-active]}
       length: {type: number, title: Length (m), minimum: 0}
-    required: [side, media]
+    required: [side, cable_type, length]
 - name: DAC SFP28 - SFP28
   description: 25G direct attach copper cable, SFP28 on both ends
   schema:
@@ -66,9 +66,9 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [both], default: both}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [1], default: 1}
-      media: {type: string, title: Media, enum: [DAC passive, DAC active]}
+      cable_type: {type: string, title: Cable type, enum: [dac-passive, dac-active]}
       length: {type: number, title: Length (m), minimum: 0}
-    required: [side, media]
+    required: [side, cable_type, length]
 - name: DAC QSFP28 - QSFP28
   description: 100G direct attach copper cable, QSFP28 on both ends
   schema:
@@ -80,9 +80,9 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [both], default: both}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [1], default: 1}
-      media: {type: string, title: Media, enum: [DAC passive, DAC active]}
+      cable_type: {type: string, title: Cable type, enum: [dac-passive, dac-active]}
       length: {type: number, title: Length (m), minimum: 0}
-    required: [side, media]
+    required: [side, cable_type, length]
 - name: AOC QSFP28 - QSFP28
   description: 100G active optical cable, QSFP28 on both ends
   schema:
@@ -94,9 +94,9 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [both], default: both}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [1], default: 1}
-      media: {type: string, title: Media, enum: [AOC], default: AOC}
+      cable_type: {type: string, title: Cable type, enum: [aoc], default: aoc}
       length: {type: number, title: Length (m), minimum: 0}
-    required: [side, media]
+    required: [side, cable_type, length]
 - name: Breakout QSFP+ - 4xSFP+
   description: 40G QSFP+ to 4x 10G SFP+ breakout cable
   schema:
@@ -108,9 +108,9 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [A, B]}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [4], default: 4}
-      media: {type: string, title: Media, enum: [DAC passive, DAC active, AOC]}
+      cable_type: {type: string, title: Cable type, enum: [dac-passive, dac-active, aoc]}
       length: {type: number, title: Length (m), minimum: 0}
-    required: [side, media]
+    required: [side, cable_type, length]
 - name: Breakout QSFP28 - 4xSFP28
   description: 100G QSFP28 to 4x 25G SFP28 breakout cable
   schema:
@@ -122,9 +122,9 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [A, B]}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [4], default: 4}
-      media: {type: string, title: Media, enum: [DAC passive, DAC active, AOC]}
+      cable_type: {type: string, title: Cable type, enum: [dac-passive, dac-active, aoc]}
       length: {type: number, title: Length (m), minimum: 0}
-    required: [side, media]
+    required: [side, cable_type, length]
 ```
 
 The module types below can be imported the same way: *Devices → Module Types
@@ -154,13 +154,16 @@ Installing a cable assembly always has the same steps:
    end. Select the device and the module bay. If the bay is empty, the plugin
    creates the module (the module type is preselected). Repeat for the other
    ends. With the first installed end the asset becomes `used`.
-3. Connect the interfaces of the ends with one NetBox cable: on the interface
-   of one end click *Connect*, choose the interfaces of the other ends, the
-   cable type (`DAC (Passive)`, `DAC (Active)` or `AOC`), the profile and the
-   length.
+3. As soon as ends on both sides are installed, the plugin connects their
+   interfaces with one NetBox cable: type (`cable_type`) and length (`length`,
+   meters) of the module type, the cable profile of the topology (`1C1P` for
+   1 + 1 ends, `1C4P:4C1P breakout` for 1 + 4 ends). Each further end is
+   added to this cable. You do not create the cable yourself.
 
-To remove a cable, delete the NetBox cable and click *Uninstall* next to each
-end. The modules stay in NetBox; delete them if the ports are empty now.
+To remove a cable assembly, click *Uninstall* next to each end. The plugin
+removes the end from the cable, and deletes the cable when one side has no
+ends any more. The modules stay in NetBox; delete them if the ports are empty
+now.
 
 ## 1. DAC SFP+ - SFP+ (10G)
 
@@ -176,10 +179,10 @@ end. The modules stay in NetBox; delete them if the ports are empty now.
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["both"], "default": "both"},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [1], "default": 1},
-    "media":  {"type": "string",  "title": "Media", "enum": ["DAC passive", "DAC active"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
-  "required": ["side", "media"]
+  "required": ["side", "cable_type", "length"]
 }
 ```
 
@@ -195,7 +198,7 @@ attribute_data:
   side: both
   a_ends: 1
   b_ends: 1
-  media: DAC passive
+  cable_type: dac-passive
   length: 1
 interfaces:
   - name: "{module}"
@@ -210,7 +213,7 @@ attribute_data:
   side: both
   a_ends: 1
   b_ends: 1
-  media: DAC passive
+  cable_type: dac-passive
   length: 3
 interfaces:
   - name: "{module}"
@@ -222,8 +225,9 @@ interfaces:
 1. Asset with module type `DAC-SFP-10G-1M`.
 2. Install `SFP+ A` in `leaf1` / module bay `Ethernet1/1`, and `SFP+ B` in
    `leaf2` / module bay `Ethernet1/1`.
-3. Cable from `leaf1 Ethernet1/1` to `leaf2 Ethernet1/1`, type
-   `DAC (Passive)`, profile `1C1P`, length 1 m.
+3. When `SFP+ B` is installed, the plugin creates the cable from
+   `leaf1 Ethernet1/1` to `leaf2 Ethernet1/1`: type `DAC (Passive)`, profile
+   `1C1P`, length 1 m.
 
 ## 2. DAC SFP28 - SFP28 (25G)
 
@@ -239,10 +243,10 @@ interfaces:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["both"], "default": "both"},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [1], "default": 1},
-    "media":  {"type": "string",  "title": "Media", "enum": ["DAC passive", "DAC active"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
-  "required": ["side", "media"]
+  "required": ["side", "cable_type", "length"]
 }
 ```
 
@@ -258,7 +262,7 @@ attribute_data:
   side: both
   a_ends: 1
   b_ends: 1
-  media: DAC passive
+  cable_type: dac-passive
   length: 2
 interfaces:
   - name: "{module}"
@@ -270,8 +274,8 @@ interfaces:
 1. Asset with module type `DAC-SFP-25G-2M`.
 2. Install `SFP28 A` in `tor1` / module bay `Ethernet1/10`, and `SFP28 B` in
    `server10` / module bay `ens1f0`.
-3. Cable from `tor1 Ethernet1/10` to `server10 ens1f0`, type `DAC (Passive)`,
-   profile `1C1P`, length 2 m.
+3. The plugin creates the cable from `tor1 Ethernet1/10` to
+   `server10 ens1f0`: type `DAC (Passive)`, profile `1C1P`, length 2 m.
 
 ## 3. DAC QSFP28 - QSFP28 (100G)
 
@@ -287,10 +291,10 @@ interfaces:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["both"], "default": "both"},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [1], "default": 1},
-    "media":  {"type": "string",  "title": "Media", "enum": ["DAC passive", "DAC active"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
-  "required": ["side", "media"]
+  "required": ["side", "cable_type", "length"]
 }
 ```
 
@@ -306,7 +310,7 @@ attribute_data:
   side: both
   a_ends: 1
   b_ends: 1
-  media: DAC passive
+  cable_type: dac-passive
   length: 1
 interfaces:
   - name: "{module}"
@@ -318,8 +322,8 @@ interfaces:
 1. Asset with module type `DAC-QSFP-100G-1M`.
 2. Install `QSFP28 A` in `leaf1` / module bay `Ethernet1/53`, and `QSFP28 B`
    in `leaf2` / module bay `Ethernet1/53`.
-3. Cable from `leaf1 Ethernet1/53` to `leaf2 Ethernet1/53`, type
-   `DAC (Passive)`, profile `1C1P`, length 1 m.
+3. The plugin creates the cable from `leaf1 Ethernet1/53` to
+   `leaf2 Ethernet1/53`: type `DAC (Passive)`, profile `1C1P`, length 1 m.
 
 ## 4. AOC QSFP28 - QSFP28 (100G)
 
@@ -335,10 +339,10 @@ interfaces:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["both"], "default": "both"},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [1], "default": 1},
-    "media":  {"type": "string",  "title": "Media", "enum": ["AOC"], "default": "AOC"},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["aoc"], "default": "aoc"},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
-  "required": ["side", "media"]
+  "required": ["side", "cable_type", "length"]
 }
 ```
 
@@ -354,7 +358,7 @@ attribute_data:
   side: both
   a_ends: 1
   b_ends: 1
-  media: AOC
+  cable_type: aoc
   length: 10
 interfaces:
   - name: "{module}"
@@ -366,8 +370,8 @@ interfaces:
 1. Asset with module type `AOC-QSFP-100G-10M`.
 2. Install `QSFP28 A` in `spine1` / module bay `Ethernet1/1`, and `QSFP28 B`
    in `leaf1` / module bay `Ethernet1/49`.
-3. Cable from `spine1 Ethernet1/1` to `leaf1 Ethernet1/49`, type `AOC`,
-   profile `1C1P`, length 10 m.
+3. The plugin creates the cable from `spine1 Ethernet1/1` to
+   `leaf1 Ethernet1/49`: type `AOC`, profile `1C1P`, length 10 m.
 
 ## 5. Breakout QSFP+ - 4xSFP+ (40G to 4x10G)
 
@@ -387,10 +391,10 @@ interfaces:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["A", "B"]},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [4], "default": 4},
-    "media":  {"type": "string",  "title": "Media", "enum": ["DAC passive", "DAC active", "AOC"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active", "aoc"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
-  "required": ["side", "media"]
+  "required": ["side", "cable_type", "length"]
 }
 ```
 
@@ -408,7 +412,7 @@ attribute_data:
   side: A
   a_ends: 1
   b_ends: 4
-  media: DAC passive
+  cable_type: dac-passive
   length: 3
 interfaces:
   - name: "{module}"
@@ -440,7 +444,7 @@ attribute_data:
   side: B
   a_ends: 1
   b_ends: 4
-  media: DAC passive
+  cable_type: dac-passive
   length: 3
 interfaces:
   - name: "{module}"
@@ -453,11 +457,17 @@ interfaces:
 2. Install `QSFP+ A` in `sw1` / module bay `Ethernet1/49`. Install
    `SFP+ B1` to `SFP+ B4` in `srv1` to `srv4` / module bay `eth0`; the module
    type `BRK-QSFP-4SFP-10G-3M-B` is preselected.
-3. One cable: side A `sw1 Ethernet1/49`, side B `srv1 eth0`, `srv2 eth0`,
-   `srv3 eth0`, `srv4 eth0` (in this order), type `DAC (Passive)`, profile
-   `1C4P:4C1P breakout`, length 3 m. NetBox then traces
-   `sw1 Ethernet1/49:1` to `srv1 eth0`, `Ethernet1/49:2` to `srv2 eth0` and
-   so on.
+3. The plugin creates one cable when the QSFP+ end and the first SFP+ end are
+   installed, and adds each further SFP+ end: side A `sw1 Ethernet1/49`,
+   side B `srv1 eth0` to `srv4 eth0` in the order B1 to B4, type
+   `DAC (Passive)`, profile `1C4P:4C1P breakout`, length 3 m. NetBox then
+   traces `sw1 Ethernet1/49:1` to `srv1 eth0`, `Ethernet1/49:2` to
+   `srv2 eth0` and so on. The ends can be installed in any order.
+4. If only some SFP+ ends are used, install them in the order B1, B2, …:
+   NetBox assigns the cable connectors by the order of the terminations, so
+   with a gap (for example B1 and B3 without B2) the plugin creates the cable
+   without a cable profile and shows a warning, until the missing end is
+   installed.
 
 ## 6. Breakout QSFP28 - 4xSFP28 (100G to 4x25G)
 
@@ -477,10 +487,10 @@ interfaces:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["A", "B"]},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [4], "default": 4},
-    "media":  {"type": "string",  "title": "Media", "enum": ["DAC passive", "DAC active", "AOC"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active", "aoc"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
-  "required": ["side", "media"]
+  "required": ["side", "cable_type", "length"]
 }
 ```
 
@@ -496,7 +506,7 @@ attribute_data:
   side: A
   a_ends: 1
   b_ends: 4
-  media: DAC passive
+  cable_type: dac-passive
   length: 2
 interfaces:
   - name: "{module}"
@@ -528,7 +538,7 @@ attribute_data:
   side: B
   a_ends: 1
   b_ends: 4
-  media: DAC passive
+  cable_type: dac-passive
   length: 2
 interfaces:
   - name: "{module}"
@@ -541,8 +551,8 @@ interfaces:
 2. Install `QSFP28 A` in `leaf1` / module bay `Ethernet1/50`. Install
    `SFP28 B1` to `SFP28 B4` in the servers `srv11` to `srv14` / module bay
    `ens1f0`.
-3. One cable: side A `leaf1 Ethernet1/50`, side B the four `ens1f0`
-   interfaces in the order B1 to B4, type `DAC (Passive)`, profile
+3. The plugin creates one cable: side A `leaf1 Ethernet1/50`, side B the four
+   `ens1f0` interfaces in the order B1 to B4, type `DAC (Passive)`, profile
    `1C4P:4C1P breakout`, length 2 m.
 
 ## Writing your own profile
@@ -571,7 +581,18 @@ A profile is a cable assembly profile if its schema has the properties
   `minimum`, `maximum`, `multipleOf` and `items`. The module type form of
   NetBox fails with an error for any other keyword (for example `const` or
   `examples`).
-- Other properties (`media`, `length`, …) are only informational.
+- `cable_type` and `length` are set on each module type and are used for the
+  cable that the plugin creates: `cable_type` is a NetBox cable type (for
+  example `dac-passive`, `dac-active`, `aoc`, `cat6`, `smf`), `length` is in
+  meters. Without them the cable has no type or no length.
+- The NetBox cable profile follows from the topology: `single-1c1p` for 1 + 1
+  ends, `breakout-1c2p-2c1p`, `breakout-1c4p-4c1p`, `breakout-1c6p-6c1p` or
+  `breakout-1c8p-8c1p` for 1 + 2, 4, 6 or 8 ends, no profile otherwise. Set the
+  optional top-level key `x-cable-profile` to use another NetBox cable profile
+  (it must have enough connectors for the ends).
+- The interface templates of each module type must have exactly one interface
+  that is not a channel subinterface; the cable is connected to it.
+- Other properties are only informational.
 
 The plugin rejects a cable assembly profile that breaks these rules when it is
 saved. Once assets use a profile, its properties `side`, `a_ends` and
