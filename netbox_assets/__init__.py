@@ -21,7 +21,7 @@ class NetBoxAssetsConfig(PluginConfig):
     author = 'Maksym Ototiuk'
     author_email = 'pypi@masik.slmail.me'
     base_url = 'assets'
-    min_version = '4.7.2'
+    min_version = '4.7.4'
     default_settings = {
         'used_status_name': 'used',
         'used_additional_status_names': [],

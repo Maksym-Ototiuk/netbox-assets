@@ -52,7 +52,8 @@ The goal is simple record keeping, not full inventory management.
 
 | NetBox           | netbox-assets |
 | ---------------- | ------------- |
-| 4.7.2 and later  | 1.1.x         |
+| 4.7.4 and later  | 1.2.x         |
+| 4.7.2 to 4.7.3   | 1.1.x         |
 
 NetBox 4.7 requires Python 3.12 or later, PostgreSQL 15 or later with the
 `ltree` extension, and Redis 6 or later.
@@ -68,6 +69,9 @@ hierarchical paths could not be restored from a database dump in that release
 - Each asset has exactly one hardware type: a device type, a module type or a
   rack type.
 - Assign an asset to a device, module or rack, reassign it or unassign it.
+- Cable assemblies (DAC, AOC, breakout cables): one asset whose ends are
+  installed as separate modules, see
+  [Cable assemblies](#cable-assemblies-dac--aoc--breakout).
 - Create a new device, module or rack directly from an asset.
 - Storage location, tenant, owning tenant and contact for each asset.
 - Automatic status: `stored` when an asset is unassigned, `used` when it is
@@ -101,6 +105,140 @@ Assets are displayed as `<manufacturer> <model> <name>`, for example
 `Cisco ASR edge-01`, or as `<manufacturer> <model>` when the asset has no
 name. Unnamed assets of the same model look the same in lists and selection
 fields, so give assets a name if you need to tell them apart.
+
+## Cable assemblies (DAC / AOC / breakout)
+
+DAC, AOC and breakout cables are **one physical asset** (one serial number,
+one asset tag), but in NetBox each end is a separate **module**: following the
+NetBox practice for pluggable transceivers, every port is a module bay, and
+the plug of the cable is a module installed in it. A breakout cable such as
+QSFP+ to 4x SFP+ has five ends. netbox-assets lets one asset be installed as
+several modules, the **ends** of the cable assembly.
+
+### Concept
+
+- The **topology** of a cable assembly is defined by a NetBox **Module Type
+  Profile**, one profile per topology (not per product or length), for
+  example `DAC SFP+ - SFP+` or `Breakout QSFP+ - 4xSFP+`.
+- A profile is a **cable assembly profile** if its JSON schema has the
+  properties `side`, `a_ends` and `b_ends`. No plugin setting is needed.
+- `a_ends` and `b_ends` are the numbers of ends on side A and side B. They are
+  fixed in the profile (one integer value in `enum`) and the plugin reads them
+  from the profile.
+- The optional top-level schema key `x-end-names` sets the names of the ends,
+  for example `SFP+ A`, `SFP+ B`. Without it the ends are named `A` / `B`, or
+  `A1`…`An` / `B1`…`Bn`.
+- Each **module type** of the profile is a product (for example one length)
+  and has the attribute `side`: `A`, `B`, or `both` for symmetric assemblies
+  where both ends are the same (DAC SFP+ - SFP+).
+- An asset whose module type has a cable assembly profile is a **cable
+  assembly**. Its module type is the side `A` or `both` module type.
+- Installing an end links one end of the asset to a module (model
+  `AssetModuleEnd`). A cable assembly is never assigned to a module directly.
+
+Example profile for a breakout cable:
+
+```json
+{
+  "type": "object",
+  "x-end-names": {"A": ["QSFP+ A"], "B": ["SFP+ B1", "SFP+ B2", "SFP+ B3", "SFP+ B4"]},
+  "properties": {
+    "side":   {"type": "string",  "title": "Assembly side", "enum": ["A", "B"]},
+    "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
+    "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [4], "default": 4},
+    "media":  {"type": "string",  "title": "Media", "enum": ["DAC passive", "DAC active", "AOC"]},
+    "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
+  },
+  "required": ["side", "media"]
+}
+```
+
+**[Cable assembly profiles](docs/cable-assembly-profiles.md)** has six
+ready-to-use profiles (DAC SFP+, DAC SFP28, DAC QSFP28, AOC QSFP28, breakout
+QSFP+ to 4x SFP+ and QSFP28 to 4x SFP28) with an import block, module types
+and installation examples, and the rules for writing your own profiles.
+
+### Setup and usage
+
+1. Create the profiles: *Devices → Module Type Profiles* (or import them from
+   the [examples](docs/cable-assembly-profiles.md#import-all-profiles)).
+2. Create the module types with the profile and the attribute `side`: one
+   `both` module type for a symmetric assembly, or a side `A` and a side `B`
+   module type for a breakout cable. Add an interface template for the port.
+3. Create the asset with the side `A` (or `both`) module type. It is
+   `stored`.
+4. On the asset page, the **Assembly Ends** panel lists all ends of the
+   profile. Click **Install** next to an end and select the device and module
+   bay. If a module is installed in the bay, it becomes the end; if the bay is
+   empty, the plugin creates the module. **Uninstall** removes the end; the
+   module stays in NetBox.
+5. Connect the interfaces of the ends with a NetBox cable (type DAC or AOC,
+   profile `1C1P`, or `1C4P:4C1P breakout` for a breakout cable).
+
+The panel shows for each end the device, module bay, module, its interfaces
+and the connected cable, and which end is the primary end. A module page
+shows the cable assembly and the end for modules that are ends. All ends are
+also listed in *Assets → Assembly Ends*, where they can be imported, exported
+and deleted in bulk.
+
+### Rules
+
+An end can be installed only if:
+
+- the asset is a cable assembly;
+- the end exists in the profile and is not installed yet;
+- the module has the right module type: side A ends (and both ends of a
+  symmetric assembly) must be modules of the asset's module type; side B ends
+  must be modules of a side `B` module type with the same profile;
+- the module is not assigned to another asset (and an end module cannot be
+  assigned to another asset).
+
+The number of ends in the profile is a maximum: a cable assembly can have no
+ends installed (in storage) or only some of them.
+
+To keep existing cable assemblies valid, the plugin refuses:
+
+- to change the module type of an asset or a module that has ends installed;
+- to change the profile or the `side` of a module type used by cable
+  assemblies, or to set a cable assembly profile on a module type whose assets
+  are assigned to modules;
+- to save an invalid cable assembly profile, to remove `side`, `a_ends` or
+  `b_ends` from a profile that is in use, or to remove an end that is
+  installed.
+
+### Status, primary end and synchronization
+
+- **Status:** a cable assembly becomes `used` when its first end is installed
+  and `stored` when its last end is removed (the same settings as for other
+  assets, see [Settings](#settings)).
+- **Primary end:** the end in the first side A slot is the primary end. If it
+  is not installed, the first installed end (in the order of the profile) is
+  the primary end. You can make another end primary (*Make primary* button);
+  if the primary end is removed, the next end becomes primary.
+- **Location:** a cable assembly is shown where its primary end is installed
+  (`installed_site`, `installed_device` and so on). Filters for the installed
+  site, location, rack and device match any installed end.
+- **Synchronization** (when `sync_hardware_serial_asset_tag` is enabled): the
+  serial number is copied to the modules of all ends, the asset tag only to
+  the module of the primary end (asset tags of modules are unique in NetBox).
+  Serial and asset tag can then be changed only on the asset. They are
+  cleared from a module when its end is uninstalled. When the asset itself is
+  deleted, the values stay on the modules, as for other assets.
+- **Deleted modules:** when the module of an end is deleted (or the device of
+  the module), the end is removed and the status and primary end are updated.
+
+### Limitations
+
+- The plugin does not create or check NetBox cables. Connect the interfaces of
+  the ends yourself.
+- Only modules can be ends. Module bay types are not checked by the plugin;
+  use NetBox module bay types (NetBox 4.7) if ends must fit certain bays
+  only.
+- An end module can be moved to another module bay with NetBox, the end moves
+  with it. NetBox does not move modules between devices while their
+  interfaces are cabled.
+- The REST API installs ends on existing modules only; the creation of a
+  module in an empty module bay is available in the web form.
 
 ## Installation
 
@@ -195,10 +333,23 @@ REST API endpoints:
 | --------------------------------------- | ----------- |
 | `/api/plugins/assets/assets/`           | Assets |
 | `/api/plugins/assets/asset-roles/`      | Asset roles |
+| `/api/plugins/assets/assembly-ends/`    | Installed ends of cable assemblies |
 | `/api/plugins/assets/dcim/devices/`     | NetBox devices with an extra `has_asset_assigned` filter |
 | `/api/plugins/assets/dcim/modules/`     | NetBox modules with an extra `has_asset_assigned` filter |
 
-GraphQL queries: `asset`, `asset_list`, `asset_role`, `asset_role_list`.
+Assets have the read-only field `is_assembly` and the filter
+`is_assembly=true|false`. An end is created with the `asset` and `module`
+IDs and the `label` of the end; if `label` is empty, the first free end that
+matches the module type is used. The read-only field `side` shows the side of
+the end.
+
+GraphQL queries: `asset`, `asset_list`, `asset_role`, `asset_role_list`,
+`assembly_end`, `assembly_end_list`. Assets have the field `ends`.
+
+To import ends (*Assets → Assembly Ends → Import*), use the columns `asset`
+(asset ID), `device` (device name), `module_bay` (module bay name), and
+optionally `label` and `is_primary`. A module must be installed in the module
+bay.
 
 ## Development
 
@@ -220,8 +371,18 @@ serializer on purpose, update the file (this does not work with `--parallel`):
 UPDATE_QUERY_COUNTS=1 python3 manage.py test netbox_assets.tests --keepdb
 ```
 
-GitHub Actions run `ruff` and the test suite against NetBox 4.7.1 and 4.7.2
-on every push and pull request.
+GitHub Actions run `ruff` and the test suite against NetBox 4.7.4 on every
+push and pull request.
+
+## Version history
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+## Links
+
+- Source code and documentation: <https://github.com/Maksym-Ototiuk/netbox-assets>
+- Issues: <https://github.com/Maksym-Ototiuk/netbox-assets/issues>
+- PyPI: <https://pypi.org/project/netbox-assets/>
 
 ## License
 

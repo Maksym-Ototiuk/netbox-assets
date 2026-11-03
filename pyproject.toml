@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "netbox-assets"
-version = "1.1.2"
+version = "1.2.0"
 authors = [
     { name = "Maksym Ototiuk", email = "pypi@masik.slmail.me" },
 ]
@@ -27,6 +27,8 @@ keywords = ["netbox", "netbox-plugin", "assets", "inventory"]
 
 [project.urls]
 Homepage = "https://github.com/Maksym-Ototiuk/netbox-assets"
+Documentation = "https://github.com/Maksym-Ototiuk/netbox-assets#readme"
+Changelog = "https://github.com/Maksym-Ototiuk/netbox-assets/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Maksym-Ototiuk/netbox-assets/issues"
 Upstream = "https://github.com/ArnesSI/netbox-inventory"
 
