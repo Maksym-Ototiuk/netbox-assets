@@ -115,7 +115,12 @@ def assembly_end_removed(instance, origin=None, **kwargs):
     """
     if _deleted_with(origin, Asset):
         return
-    asset = Asset.objects.select_for_update().filter(pk=instance.asset_id).first()
+    asset = (
+        Asset.objects.select_for_update(of=('self',))
+        .filter(pk=instance.asset_id)
+        .order_by('pk')
+        .first()
+    )
     if asset is None:
         return
     if origin is None or _deleted_with(origin, AssetModuleEnd):
