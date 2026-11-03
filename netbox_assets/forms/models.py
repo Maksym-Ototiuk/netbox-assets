@@ -314,14 +314,12 @@ class AssetModuleEndForm(NetBoxModelForm):
         self.fields['module_type'].queryset = ModuleType.objects.filter(
             profile=module_type.profile_id
         )
-        self.fields['module_type'].widget.add_query_params(
-            {'profile_id': module_type.profile_id}
-        )
+        query_params = {'profile_id': module_type.profile_id}
         slot = spec.get_slot(self.initial.get('label') or self.instance.label)
         if slot and (slot.side == SIDE_A or get_module_type_side(module_type) == SIDE_BOTH):
             self.initial.setdefault('module_type', module_type.pk)
         elif slot and slot.side == SIDE_B:
-            self.fields['module_type'].widget.add_query_params(
+            query_params.update(
                 {'attr_side': SIDE_B, 'manufacturer_id': module_type.manufacturer_id}
             )
             candidates = ModuleType.objects.filter(
@@ -331,6 +329,7 @@ class AssetModuleEndForm(NetBoxModelForm):
             )
             if len(candidates[:2]) == 1:
                 self.initial.setdefault('module_type', candidates[0].pk)
+        self.fields['module_type'].widget.add_query_params(query_params)
 
     def _get_asset(self):
         value = self.data.get('asset') if self.is_bound else None

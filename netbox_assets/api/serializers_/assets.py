@@ -138,6 +138,9 @@ class AssetSerializer(PrimaryModelSerializer):
 
     def to_internal_value(self, data):
         ret = super().to_internal_value(data)
+        if self.nested:
+            # a related asset (e.g. of an assembly end) resolves to the instance
+            return ret
         # store empty asset tag and serial as NULL, so that the unique
         # constraints ignore them
         if 'asset_tag' in ret and ret['asset_tag'] == '':

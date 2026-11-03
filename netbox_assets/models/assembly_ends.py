@@ -1,4 +1,4 @@
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models, router, transaction
 
 from dcim.models import Module
@@ -72,11 +72,21 @@ class AssetModuleEnd(NetBoxModel):
         verbose_name_plural = 'assembly ends'
 
     def __str__(self):
-        return f'{self.asset}: {self.label}'
+        asset = self._get_asset()
+        return f'{asset}: {self.label}' if asset else self.label
+
+    def _get_asset(self):
+        # the asset can be missing if the user is not allowed to view it
+        # (e.g. in GraphQL, where related objects are restricted)
+        try:
+            return self.asset
+        except ObjectDoesNotExist:
+            return None
 
     @property
     def slot(self):
-        spec = self.asset.assembly_spec if self.asset_id else None
+        asset = self._get_asset()
+        spec = asset.assembly_spec if asset else None
         return spec.get_slot(self.label) if spec else None
 
     @property
@@ -131,7 +141,9 @@ class AssetModuleEnd(NetBoxModel):
         if module is not None:
             self.validate_module(asset, slot, module)
         if not self._state.adding and not self.is_primary:
-            if AssetModuleEnd.objects.filter(pk=self.pk, is_primary=True).exists():
+            if AssetModuleEnd.objects.filter(
+                pk=self.pk, asset_id=self.asset_id, is_primary=True
+            ).exists():
                 raise ValidationError(
                     {'is_primary': 'Mark another end as primary instead.'}
                 )
@@ -195,19 +207,28 @@ class AssetModuleEnd(NetBoxModel):
         from .assets import Asset
 
         with transaction.atomic(using=router.db_for_write(AssetModuleEnd)):
-            # serialize concurrent changes of the same cable assembly
-            asset = Asset.objects.select_for_update().get(pk=self.asset_id)
-            created = self._state.adding
             previous = None
-            if not created:
+            if not self._state.adding:
                 previous = (
                     AssetModuleEnd.objects.filter(pk=self.pk)
                     .select_related('module')
                     .first()
                 )
-            installed = asset.ends.count()
+            # an end can be moved to another cable assembly
+            moved = previous is not None and previous.asset_id != self.asset_id
+            # serialize concurrent changes of the same cable assemblies
+            asset_ids = {self.asset_id, previous.asset_id if moved else self.asset_id}
+            assets = {
+                asset.pk: asset
+                for asset in Asset.objects.select_for_update(of=('self',))
+                .filter(pk__in=asset_ids)
+                .order_by('pk')
+            }
+            asset = assets[self.asset_id]
+            added = self._state.adding or moved
+            installed = asset.ends.exclude(pk=self.pk).count()
 
-            if created and not self.is_primary:
+            if added and not self.is_primary:
                 self.is_primary = self.get_default_primary(asset)
             if self.is_primary:
                 # unset the old primary end first, this also clears the asset
@@ -222,5 +243,7 @@ class AssetModuleEnd(NetBoxModel):
             if previous and previous.module_id != self.module_id:
                 asset.clear_assembly_end_module(previous.module)
             asset.sync_assembly_end(self)
-            if created and installed == 0:
+            if moved:
+                assets[previous.asset_id].update_assembly_after_end_removed()
+            if added and installed == 0:
                 asset.set_assembly_status('used')

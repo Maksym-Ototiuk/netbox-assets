@@ -69,7 +69,7 @@ class AssetModuleEndListView(generic.ObjectListView):
         'asset__module_type__profile',
         'module__device',
         'module__module_bay',
-        'module__module_type',
+        'module__module_type__manufacturer',
     )
     table = tables.AssetModuleEndTable
     filterset = filtersets.AssetModuleEndFilterSet

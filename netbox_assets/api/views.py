@@ -62,8 +62,11 @@ class AssetViewSet(NetBoxModelViewSet):
 
 class AssetModuleEndViewSet(NetBoxModelViewSet):
     queryset = models.AssetModuleEnd.objects.select_related(
+        'asset__module_type__manufacturer',
         'asset__module_type__profile',
-        'module',
+        'module__device',
+        'module__module_bay',
+        'module__module_type__manufacturer',
     ).prefetch_related('tags')
     serializer_class = AssetModuleEndSerializer
     filterset_class = filtersets.AssetModuleEndFilterSet
