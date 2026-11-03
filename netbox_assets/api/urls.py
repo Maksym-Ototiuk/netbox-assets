@@ -10,6 +10,7 @@ router.APIRootView = views.NetBoxAssetsRootView
 # Assets
 router.register('assets', views.AssetViewSet)
 router.register('asset-roles', views.AssetRoleViewSet)
+router.register('assembly-ends', views.AssetModuleEndViewSet)
 
 # NetBox devices and modules with an additional has_asset_assigned filter
 # (used by the asset assignment forms)

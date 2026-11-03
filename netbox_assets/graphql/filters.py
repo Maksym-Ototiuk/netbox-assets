@@ -5,12 +5,17 @@ import strawberry_django
 from strawberry import ID
 from strawberry_django import StrFilterLookup
 
-from netbox.graphql.filters import NestedGroupModelFilter, PrimaryModelFilter
+from netbox.graphql.filters import (
+    NestedGroupModelFilter,
+    NetBoxModelFilter,
+    PrimaryModelFilter,
+)
 
 from .. import models
 
 __all__ = (
     'AssetFilter',
+    'AssetModuleEndFilter',
     'AssetRoleFilter',
 )
 
@@ -41,3 +46,15 @@ class AssetFilter(PrimaryModelFilter):
     contact_id: ID | None = strawberry_django.filter_field()
     owning_tenant_id: ID | None = strawberry_django.filter_field()
     storage_location_id: ID | None = strawberry_django.filter_field()
+
+
+@strawberry_django.filter_type(models.AssetModuleEnd, lookups=True)
+class AssetModuleEndFilter(NetBoxModelFilter):
+    asset: (
+        Annotated['AssetFilter', strawberry.lazy('netbox_assets.graphql.filters')]
+        | None
+    ) = strawberry_django.filter_field()
+    asset_id: ID | None = strawberry_django.filter_field()
+    module_id: ID | None = strawberry_django.filter_field()
+    label: StrFilterLookup | None = strawberry_django.filter_field()
+    is_primary: bool | None = strawberry_django.filter_field()

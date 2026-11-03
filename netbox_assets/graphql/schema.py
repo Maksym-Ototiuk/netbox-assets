@@ -1,7 +1,7 @@
 import strawberry
 import strawberry_django
 
-from .types import AssetRoleType, AssetType
+from .types import AssetModuleEndType, AssetRoleType, AssetType
 
 __all__ = ('NetBoxAssetsQuery',)
 
@@ -18,3 +18,6 @@ class NetBoxAssetsQuery:
 
     asset_role: AssetRoleType = strawberry_django.field()
     asset_role_list: list[AssetRoleType] = strawberry_django.field()
+
+    assembly_end: AssetModuleEndType = strawberry_django.field()
+    assembly_end_list: list[AssetModuleEndType] = strawberry_django.field()

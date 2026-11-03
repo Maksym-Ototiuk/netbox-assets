@@ -4,10 +4,14 @@ import strawberry
 import strawberry_django
 
 from extras.graphql.mixins import ImageAttachmentsMixin
-from netbox.graphql.types import NestedLtreeGroupObjectType, PrimaryObjectType
+from netbox.graphql.types import (
+    NestedLtreeGroupObjectType,
+    NetBoxObjectType,
+    PrimaryObjectType,
+)
 
 from .. import models
-from .filters import AssetFilter, AssetRoleFilter
+from .filters import AssetFilter, AssetModuleEndFilter, AssetRoleFilter
 
 if TYPE_CHECKING:
     # Only for type checkers and linters; at runtime the core types are
@@ -24,6 +28,7 @@ if TYPE_CHECKING:
     from tenancy.graphql.types import ContactType, TenantType
 
 __all__ = (
+    'AssetModuleEndType',
     'AssetRoleType',
     'AssetType',
 )
@@ -78,3 +83,17 @@ class AssetType(ImageAttachmentsMixin, PrimaryObjectType):
     storage_location: (
         Annotated['LocationType', strawberry.lazy('dcim.graphql.types')] | None
     )
+    ends: list[
+        Annotated['AssetModuleEndType', strawberry.lazy('netbox_assets.graphql.types')]
+    ]
+
+
+@strawberry_django.type(
+    models.AssetModuleEnd,
+    fields='__all__',
+    filters=AssetModuleEndFilter,
+    pagination=True,
+)
+class AssetModuleEndType(NetBoxObjectType):
+    asset: Annotated['AssetType', strawberry.lazy('netbox_assets.graphql.types')]
+    module: Annotated['ModuleType', strawberry.lazy('dcim.graphql.types')]

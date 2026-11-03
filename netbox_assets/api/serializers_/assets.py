@@ -9,14 +9,19 @@ from dcim.api.serializers import (
     RackSerializer,
     RackTypeSerializer,
 )
-from netbox.api.serializers import NestedGroupModelSerializer, PrimaryModelSerializer
+from netbox.api.serializers import (
+    NestedGroupModelSerializer,
+    NetBoxModelSerializer,
+    PrimaryModelSerializer,
+)
 from tenancy.api.serializers import ContactSerializer, TenantSerializer
 
 from ...choices import HardwareKindChoices
-from ...models import Asset, AssetRole
+from ...models import Asset, AssetModuleEnd, AssetRole
 from .nested import NestedAssetRoleSerializer
 
 __all__ = (
+    'AssetModuleEndSerializer',
     'AssetRoleSerializer',
     'AssetSerializer',
 )
@@ -62,6 +67,8 @@ class AssetRoleSerializer(NestedGroupModelSerializer):
 class AssetSerializer(PrimaryModelSerializer):
     # Read-only kind of hardware (device, module or rack), derived from the type
     kind = serializers.ChoiceField(choices=HardwareKindChoices, read_only=True)
+    # Read-only: the module type has a cable assembly profile
+    is_assembly = serializers.BooleanField(read_only=True)
     device_type = DeviceTypeSerializer(
         nested=True,
         required=False,
@@ -152,6 +159,7 @@ class AssetSerializer(PrimaryModelSerializer):
             'serial',
             'status',
             'kind',
+            'is_assembly',
             'role',
             'device_type',
             'device',
@@ -182,4 +190,44 @@ class AssetSerializer(PrimaryModelSerializer):
         # constraints. They don't work when some fields of a constraint may be
         # NULL, so we remove them and rely on the model's validation instead.
         # See https://www.django-rest-framework.org/api-guide/validators/#optional-fields
+        validators = []
+
+
+class AssetModuleEndSerializer(NetBoxModelSerializer):
+    asset = AssetSerializer(nested=True)
+    module = ModuleSerializer(nested=True)
+    label = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=AssetModuleEnd._meta.get_field('label').max_length,
+        help_text=AssetModuleEnd._meta.get_field('label').help_text,
+    )
+    side = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = AssetModuleEnd
+        fields = (
+            'id',
+            'url',
+            'display_url',
+            'display',
+            'asset',
+            'module',
+            'label',
+            'side',
+            'is_primary',
+            'tags',
+            'custom_fields',
+            'created',
+            'last_updated',
+        )
+        brief_fields = (
+            'id',
+            'url',
+            'display',
+            'label',
+            'is_primary',
+        )
+        # The "one primary end" constraint is handled by the model (the old
+        # primary end is unset on save), so DRF must not validate it
         validators = []

@@ -7,6 +7,7 @@ from .. import filtersets, models
 from .serializers import *
 
 __all__ = (
+    'AssetModuleEndViewSet',
     'AssetRoleViewSet',
     'AssetViewSet',
     'DeviceAssetViewSet',
@@ -47,7 +48,7 @@ class AssetViewSet(NetBoxModelViewSet):
     queryset = models.Asset.objects.prefetch_related(
         'device_type',
         'device',
-        'module_type',
+        'module_type__profile',
         'module',
         'rack_type',
         'rack',
@@ -57,6 +58,15 @@ class AssetViewSet(NetBoxModelViewSet):
     )
     serializer_class = AssetSerializer
     filterset_class = filtersets.AssetFilterSet
+
+
+class AssetModuleEndViewSet(NetBoxModelViewSet):
+    queryset = models.AssetModuleEnd.objects.select_related(
+        'asset__module_type__profile',
+        'module',
+    ).prefetch_related('tags')
+    serializer_class = AssetModuleEndSerializer
+    filterset_class = filtersets.AssetModuleEndFilterSet
 
 
 #
