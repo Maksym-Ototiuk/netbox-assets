@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 from django.db.models.signals import pre_save
@@ -55,19 +57,43 @@ def get_all_statuses_for(status):
     return list(status_names)
 
 
-def asset_clear_old_hw(old_hw):
-    # need to temporarily disconnect signal receiver that prevents update of device serial if asset assigned
+@contextmanager
+def allow_hw_serial_asset_tag_update():
+    """
+    Temporarily disconnect the signal receiver that prevents changes of serial
+    and asset tag of hardware that has an asset assigned.
+    """
     from .signals import prevent_update_serial_asset_tag
 
-    pre_save.disconnect(prevent_update_serial_asset_tag, sender=Device)
-    pre_save.disconnect(prevent_update_serial_asset_tag, sender=Module)
-    pre_save.disconnect(prevent_update_serial_asset_tag, sender=Rack)
-    old_hw.serial = ''
-    old_hw.asset_tag = None
-    old_hw.save()
-    pre_save.connect(prevent_update_serial_asset_tag, sender=Device)
-    pre_save.connect(prevent_update_serial_asset_tag, sender=Module)
-    pre_save.connect(prevent_update_serial_asset_tag, sender=Rack)
+    senders = (Device, Module, Rack)
+    for sender in senders:
+        pre_save.disconnect(prevent_update_serial_asset_tag, sender=sender)
+    try:
+        yield
+    finally:
+        for sender in senders:
+            pre_save.connect(prevent_update_serial_asset_tag, sender=sender)
+
+
+def asset_clear_old_hw(old_hw):
+    with allow_hw_serial_asset_tag_update():
+        old_hw.serial = ''
+        old_hw.asset_tag = None
+        old_hw.save()
+
+
+def set_hw_serial_asset_tag(hw, serial, asset_tag):
+    """
+    Set serial and asset tag of hardware (used for the modules of cable
+    assembly ends). Saves the hardware only if a value changes.
+    """
+    if hw.serial == serial and hw.asset_tag == asset_tag:
+        return
+    hw.snapshot()
+    hw.serial = serial
+    hw.asset_tag = asset_tag
+    with allow_hw_serial_asset_tag_update():
+        hw.save()
 
 
 def asset_set_new_hw(asset, hw):
@@ -114,6 +140,8 @@ def query_located(queryset, field_name, values, assets_shown='all'):
         * values - list of PKs of location types to filter on
         * assets_shown - 'all' or 'installed' or 'stored'
     """
+    from .models import AssetModuleEnd
+
     if field_name == 'rack':
         q_installed = Q(**{'rack__in': values})
     else:
@@ -122,6 +150,12 @@ def query_located(queryset, field_name, values, assets_shown='all'):
         q_installed
         | Q(**{f'device__{field_name}__in': values})
         | Q(**{f'module__device__{field_name}__in': values})
+        # cable assemblies: any installed end
+        | Q(
+            pk__in=AssetModuleEnd.objects.filter(
+                **{f'module__device__{field_name}__in': values}
+            ).values('asset_id')
+        )
     )
 
     # Q expressions for stored

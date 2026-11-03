@@ -4,6 +4,14 @@ from django.forms import ValidationError
 from netbox.models import PrimaryModel
 from netbox.models.features import ImageAttachmentsMixin
 
+from ..assembly import (
+    SIDE_A,
+    SIDE_BOTH,
+    get_assembly_spec,
+    get_module_type_side,
+    is_assembly_module_type,
+    validate_assembly_schema,
+)
 from ..choices import AssetStatusChoices, HardwareKindChoices
 from ..managers import AssetManager
 from ..utils import (
@@ -12,6 +20,7 @@ from ..utils import (
     get_plugin_setting,
     get_prechange_field,
     get_status_for,
+    set_hw_serial_asset_tag,
 )
 
 __all__ = ('Asset',)
@@ -27,6 +36,10 @@ class Asset(PrimaryModel, ImageAttachmentsMixin):
     storage location (instance of Location) where it is kept when not in use.
 
     An asset that is in use can be assigned to a Device, Module or Rack.
+
+    A cable assembly (DAC, AOC, breakout cable) is an asset whose module type
+    has a cable assembly profile. It is not assigned to a module directly:
+    each of its ends is installed as a separate module (AssetModuleEnd).
     """
 
     objects = AssetManager()
@@ -205,7 +218,41 @@ class Asset(PrimaryModel, ImageAttachmentsMixin):
 
     @property
     def hardware(self):
-        return self.device or self.module or self.rack or None
+        hardware = self.device or self.module or self.rack
+        if hardware is None and self.is_assembly:
+            # a cable assembly is shown at its primary end
+            end = self.primary_end
+            hardware = end.module if end else None
+        return hardware
+
+    @property
+    def is_assembly(self):
+        return bool(self.module_type_id) and is_assembly_module_type(self.module_type)
+
+    @property
+    def assembly_spec(self):
+        """Ends (slots) of a cable assembly, None for other assets."""
+        if not self.module_type_id:
+            return None
+        return get_assembly_spec(self.module_type)
+
+    @property
+    def primary_end(self):
+        if not self.pk:
+            return None
+        # iterate over ends.all() so that prefetched ends are used in lists
+        for end in self.ends.all():
+            if end.is_primary:
+                return end
+        return None
+
+    def get_ordered_ends(self, ends=None):
+        """Installed ends of a cable assembly, in the order of the slots."""
+        spec = self.assembly_spec
+        ends = list(self.ends.all() if ends is None else ends)
+        if spec:
+            ends.sort(key=lambda end: spec.index(end.label))
+        return ends
 
     @property
     def storage_site(self):
@@ -266,11 +313,15 @@ class Asset(PrimaryModel, ImageAttachmentsMixin):
     def clean(self):
         self.validate_hardware_types()
         self.validate_hardware()
+        self.validate_assembly()
         self.update_status()
         return super().clean()
 
     def save(self, clear_old_hw=True, *args, **kwargs):
-        self.update_hardware_used(clear_old_hw)
+        if self.is_assembly:
+            self.sync_assembly_ends()
+        else:
+            self.update_hardware_used(clear_old_hw)
         return super().save(*args, **kwargs)
 
     def validate_hardware_types(self):
@@ -311,6 +362,65 @@ class Asset(PrimaryModel, ImageAttachmentsMixin):
                 raise ValidationError(
                     f'Cannot set {hw_other} for asset that is a {kind}'
                 )
+
+    def validate_assembly(self):
+        """
+        A cable assembly must be a side A or "both" module type of a valid
+        cable assembly profile and is never assigned to a module directly.
+        A module that is an end of a cable assembly cannot be assigned to
+        another asset.
+        """
+        from .assembly_ends import AssetModuleEnd
+
+        if (
+            self.module_id
+            and AssetModuleEnd.objects.filter(module_id=self.module_id).exists()
+        ):
+            raise ValidationError(
+                {'module': 'This module is an end of a cable assembly.'}
+            )
+        if self.pk and self.ends.exists():
+            old_module_type_id = (
+                Asset.objects.filter(pk=self.pk)
+                .values_list('module_type_id', flat=True)
+                .first()
+            )
+            if old_module_type_id != self.module_type_id:
+                raise ValidationError(
+                    {
+                        'module_type': 'Cannot change the module type of a cable '
+                        'assembly while its ends are installed.'
+                    }
+                )
+        if not self.is_assembly:
+            return
+        profile = self.module_type.profile
+        errors = validate_assembly_schema(profile.schema)
+        if errors:
+            raise ValidationError(
+                {
+                    'module_type': [
+                        f'Profile {profile} is not a valid cable assembly profile: {error}'
+                        for error in errors
+                    ]
+                }
+            )
+        if self.module_id:
+            raise ValidationError(
+                {
+                    'module': 'A cable assembly is not assigned to a module. '
+                    'Install its ends instead.'
+                }
+            )
+        side = get_module_type_side(self.module_type)
+        if side not in (SIDE_A, SIDE_BOTH):
+            raise ValidationError(
+                {
+                    'module_type': f'Module type {self.module_type} has assembly side '
+                    f'"{side or ""}". The asset of a cable assembly must have the '
+                    f'side "A" or "both" module type.'
+                }
+            )
 
     def update_status(self):
         """
@@ -358,6 +468,58 @@ class Asset(PrimaryModel, ImageAttachmentsMixin):
             # just changed asset's serial or asset_tag, update assigned hw
             if new_hw:
                 asset_set_new_hw(asset=self, hw=new_hw)
+
+    def sync_assembly_ends(self):
+        """Keep the modules of all installed ends of a cable assembly in sync."""
+        if not self.pk or not get_plugin_setting('sync_hardware_serial_asset_tag'):
+            return
+        for end in self.ends.select_related('module'):
+            self.sync_assembly_end(end)
+
+    def sync_assembly_end(self, end):
+        """
+        Set serial on the module of an installed end, and asset tag on the
+        module of the primary end only (asset tags of modules are unique).
+        """
+        if not get_plugin_setting('sync_hardware_serial_asset_tag'):
+            return
+        set_hw_serial_asset_tag(
+            end.module,
+            serial=self.serial or '',
+            asset_tag=(self.asset_tag or None) if end.is_primary else None,
+        )
+
+    def clear_assembly_end_module(self, module):
+        """Clear serial and asset tag of a module that is no longer an end."""
+        if not get_plugin_setting('sync_hardware_serial_asset_tag'):
+            return
+        set_hw_serial_asset_tag(module, serial='', asset_tag=None)
+
+    def set_assembly_status(self, status):
+        """
+        Set status of a cable assembly to the 'used' or 'stored' status (as
+        configured) when its first end is installed or its last end removed.
+        """
+        new_status = get_status_for(status)
+        if new_status and self.status != new_status:
+            self.snapshot()
+            self.status = new_status
+            self.save()
+
+    def update_assembly_after_end_removed(self):
+        """
+        After an end was removed: if no ends are left, the assembly is stored.
+        If the primary end was removed, the first remaining end (in the order
+        of the slots) becomes the primary end.
+        """
+        ends = self.get_ordered_ends(self.ends.select_related('module'))
+        if not ends:
+            self.set_assembly_status('stored')
+        elif not any(end.is_primary for end in ends):
+            end = ends[0]
+            end.snapshot()
+            end.is_primary = True
+            end.save()
 
     def get_status_color(self):
         return AssetStatusChoices.colors.get(self.status)
