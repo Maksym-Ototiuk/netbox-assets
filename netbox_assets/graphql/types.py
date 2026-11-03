@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     # Only for type checkers and linters; at runtime the core types are
     # resolved lazily via strawberry.lazy()
     from dcim.graphql.types import (
+        CableType,
         DeviceType,
         DeviceTypeType,
         LocationType,
@@ -83,6 +84,7 @@ class AssetType(ImageAttachmentsMixin, PrimaryObjectType):
     storage_location: (
         Annotated['LocationType', strawberry.lazy('dcim.graphql.types')] | None
     )
+    assembly_cable: Annotated['CableType', strawberry.lazy('dcim.graphql.types')] | None
     ends: list[
         Annotated['AssetModuleEndType', strawberry.lazy('netbox_assets.graphql.types')]
     ]

@@ -184,6 +184,20 @@ class Asset(PrimaryModel, ImageAttachmentsMixin):
         null=True,
     )
 
+    #
+    # cable assemblies
+    #
+    assembly_cable = models.OneToOneField(
+        help_text='NetBox cable that connects the installed ends of a cable assembly',
+        to='dcim.Cable',
+        on_delete=models.SET_NULL,
+        related_name='assembly_asset',
+        blank=True,
+        null=True,
+        editable=False,
+        verbose_name='Assembly Cable',
+    )
+
     clone_fields = [
         'name',
         'asset_tag',
@@ -510,7 +524,8 @@ class Asset(PrimaryModel, ImageAttachmentsMixin):
         """
         After an end was removed: if no ends are left, the assembly is stored.
         If the primary end was removed, the first remaining end (in the order
-        of the slots) becomes the primary end.
+        of the slots) becomes the primary end. The cable is not changed here,
+        see sync_assembly_cable().
         """
         ends = self.get_ordered_ends(self.ends.select_related('module'))
         if not ends:
@@ -519,7 +534,14 @@ class Asset(PrimaryModel, ImageAttachmentsMixin):
             end = ends[0]
             end.snapshot()
             end.is_primary = True
+            end.skip_cable_sync = True
             end.save()
+
+    def sync_assembly_cable(self, check_permissions=True):
+        """Create, change or delete the NetBox cable of a cable assembly."""
+        from ..cables import sync_assembly_cable
+
+        sync_assembly_cable(self, check_permissions=check_permissions)
 
     def get_status_color(self):
         return AssetStatusChoices.colors.get(self.status)

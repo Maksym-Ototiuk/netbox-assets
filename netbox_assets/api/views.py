@@ -50,6 +50,7 @@ class AssetViewSet(NetBoxModelViewSet):
         'device',
         'module_type__profile',
         'module',
+        'assembly_cable',
         'rack_type',
         'rack',
         'role',

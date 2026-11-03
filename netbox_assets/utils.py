@@ -3,11 +3,21 @@ from contextlib import contextmanager
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 from django.db.models.signals import pre_save
+from django.utils.html import escape
 
 from dcim.models import Device, Module, Rack
 from netbox.plugins import get_plugin_config
+from utilities.exceptions import AbortRequest
 
 from .choices import AssetStatusChoices
+
+
+def abort_request(message):
+    """
+    AbortRequest with an escaped message: NetBox views show AbortRequest
+    messages as HTML, and the messages contain names entered by users.
+    """
+    return AbortRequest(escape(message))
 
 
 def get_prechange_field(obj, field_name):

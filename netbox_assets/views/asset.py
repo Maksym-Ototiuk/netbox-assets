@@ -25,7 +25,16 @@ class AssetView(generic.ObjectView):
     def get_extra_context(self, request, instance):
         if not instance.is_assembly:
             return {}
-        return {'assembly_slots': self.get_assembly_slots(instance)}
+        spec = instance.assembly_spec
+        cable = instance.assembly_cable
+        return {
+            'assembly_slots': self.get_assembly_slots(instance),
+            # installed ends with a gap: the cable has no profile, NetBox
+            # cannot trace the single channels
+            'assembly_cable_without_profile': bool(
+                spec and cable and spec.cable_profile and not cable.profile
+            ),
+        }
 
     @staticmethod
     def get_assembly_slots(asset):

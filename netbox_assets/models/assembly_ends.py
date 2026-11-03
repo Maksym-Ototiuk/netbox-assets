@@ -178,6 +178,39 @@ class AssetModuleEnd(NetBoxModel):
                 raise ValidationError(
                     f'Module {module} is already assigned to asset {assigned}.'
                 )
+        self.validate_module_interface(asset, module)
+
+    def validate_module_interface(self, asset, module):
+        """
+        The cable of the assembly is connected to the only interface of the end
+        module that is not a channel subinterface, so there must be exactly one
+        such interface, and it must not have a cable of something else.
+        """
+        from ..cables import count_end_interfaces, get_end_interface
+
+        if count_end_interfaces(module) != 1:
+            raise ValidationError(
+                f'Module type {module.module_type} must have exactly one interface '
+                f'(not counting channel subinterfaces) to connect the cable of the '
+                f'assembly.'
+            )
+        interface = get_end_interface(module) if module.pk else None
+        if interface is None or interface.cable_id is None:
+            return
+        # the assembly's own cable (or the cable of the assembly the end is
+        # moved from) is fine
+        own_cables = {asset.assembly_cable_id}
+        if not self._state.adding:
+            own_cables |= set(
+                AssetModuleEnd.objects.filter(pk=self.pk).values_list(
+                    'asset__assembly_cable', flat=True
+                )
+            )
+        if interface.cable_id not in own_cables:
+            raise ValidationError(
+                f'Interface {interface} of module {module} already has cable '
+                f'{interface.cable}. Delete the cable first.'
+            )
 
     def get_free_label(self, asset, spec, module):
         """First free end that matches the module type of the module."""
@@ -236,6 +269,7 @@ class AssetModuleEnd(NetBoxModel):
                 for other in asset.ends.filter(is_primary=True).exclude(pk=self.pk):
                     other.snapshot()
                     other.is_primary = False
+                    other.skip_cable_sync = True
                     other.save()
 
             super().save(*args, **kwargs)
@@ -247,3 +281,9 @@ class AssetModuleEnd(NetBoxModel):
                 assets[previous.asset_id].update_assembly_after_end_removed()
             if added and installed == 0:
                 asset.set_assembly_status('used')
+
+            if not getattr(self, 'skip_cable_sync', False):
+                if moved:
+                    # release the interface from the old assembly's cable first
+                    assets[previous.asset_id].sync_assembly_cable()
+                asset.sync_assembly_cable()

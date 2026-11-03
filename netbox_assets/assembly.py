@@ -12,14 +12,24 @@ profile if its JSON schema has the properties `side`, `a_ends` and `b_ends`.
 - The optional top-level key `x-end-names` sets the names of the ends, e.g.
   {"A": ["QSFP+ A"], "B": ["SFP+ B1", "SFP+ B2", "SFP+ B3", "SFP+ B4"]}.
   Without it the ends are named A / B, or A1..An / B1..Bn.
+
+Cable: when ends on both sides are installed, the plugin connects them with one
+NetBox cable. Its type and length are the module type attributes `cable_type`
+(a NetBox cable type, e.g. "dac-passive") and `length` (in meters). The NetBox
+cable profile follows from the topology (1 + 1 ends: single 1C1P, 1 + N ends:
+1CNP:NC1P breakout) or is set with the optional top-level key
+`x-cable-profile`.
 """
 
 from collections import namedtuple
 
 from django.db.models import Q
 
+from dcim.choices import CableProfileChoices, CableTypeChoices
+
 __all__ = (
     'ASSEMBLY_PROPERTIES',
+    'CABLE_PROFILE_KEY',
     'END_LABEL_MAX_LENGTH',
     'END_NAMES_KEY',
     'SIDE_A',
@@ -37,6 +47,7 @@ __all__ = (
 
 ASSEMBLY_PROPERTIES = ('side', 'a_ends', 'b_ends')
 END_NAMES_KEY = 'x-end-names'
+CABLE_PROFILE_KEY = 'x-cable-profile'
 END_LABEL_MAX_LENGTH = 32
 
 SIDE_A = 'A'
@@ -92,6 +103,51 @@ def _default_labels(side, count):
     if count == 1:
         return [side]
     return [f'{side}{i}' for i in range(1, count + 1)]
+
+
+def default_cable_profile(a_ends, b_ends):
+    """NetBox cable profile for a topology, '' if there is no matching one."""
+    if a_ends == 1 and b_ends == 1:
+        return CableProfileChoices.SINGLE_1C1P
+    profile = f'breakout-1c{b_ends}p-{b_ends}c1p'
+    if a_ends == 1 and profile in CableProfileChoices.values():
+        return profile
+    return ''
+
+
+def _cable_profile_class(profile):
+    from dcim.models import Cable
+
+    return Cable(profile=profile).profile_class
+
+
+def _validate_cable(schema, counts):
+    """Return errors for the cable profile and the cable_type property."""
+    errors = []
+    profile = schema.get(CABLE_PROFILE_KEY)
+    if profile is not None:
+        if profile not in CableProfileChoices.values():
+            errors.append(
+                f'"{CABLE_PROFILE_KEY}": unknown NetBox cable profile "{profile}".'
+            )
+        elif counts.keys() == {SIDE_A, SIDE_B}:
+            profile_class = _cable_profile_class(profile)
+            if (
+                len(profile_class.a_connectors) < counts[SIDE_A]
+                or len(profile_class.b_connectors) < counts[SIDE_B]
+            ):
+                errors.append(
+                    f'"{CABLE_PROFILE_KEY}": cable profile "{profile}" has too few '
+                    f'connectors for {counts[SIDE_A]} side A and {counts[SIDE_B]} '
+                    f'side B ends.'
+                )
+    cable_types = schema['properties'].get('cable_type', {}).get('enum') or []
+    if unknown := [t for t in cable_types if t not in CableTypeChoices.values()]:
+        errors.append(
+            f'Property "cable_type": unknown NetBox cable types: '
+            f'{", ".join(map(str, unknown))}.'
+        )
+    return errors
 
 
 def _validate_end_counts(properties):
@@ -163,6 +219,7 @@ def validate_assembly_schema(schema):
     counts, errors = _validate_end_counts(schema['properties'])
     if schema.get(END_NAMES_KEY) is not None:
         errors += _validate_end_names(schema[END_NAMES_KEY], counts)
+    errors += _validate_cable(schema, counts)
     return errors
 
 
@@ -172,10 +229,14 @@ class AssemblySpec:
     first, then side B slots.
     """
 
-    def __init__(self, a_labels, b_labels):
+    def __init__(self, a_labels, b_labels, cable_profile=None):
         self.slots = [AssemblySlot(label, SIDE_A) for label in a_labels] + [
             AssemblySlot(label, SIDE_B) for label in b_labels
         ]
+        if cable_profile is None:
+            cable_profile = default_cable_profile(len(a_labels), len(b_labels))
+        # NetBox cable profile of the assembly cable ('' for none)
+        self.cable_profile = cable_profile
 
     @classmethod
     def from_schema(cls, schema):
@@ -189,6 +250,7 @@ class AssemblySpec:
         return cls(
             names.get(SIDE_A) or _default_labels(SIDE_A, a_ends),
             names.get(SIDE_B) or _default_labels(SIDE_B, b_ends),
+            schema.get(CABLE_PROFILE_KEY),
         )
 
     @property
@@ -202,6 +264,9 @@ class AssemblySpec:
     @property
     def b_ends(self):
         return sum(1 for slot in self.slots if slot.side == SIDE_B)
+
+    def side_labels(self, side):
+        return [slot.label for slot in self.slots if slot.side == side]
 
     def get_slot(self, label):
         for slot in self.slots:

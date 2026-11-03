@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from dcim.api.serializers import (
+    CableSerializer,
     DeviceSerializer,
     DeviceTypeSerializer,
     LocationSerializer,
@@ -69,6 +70,8 @@ class AssetSerializer(PrimaryModelSerializer):
     kind = serializers.ChoiceField(choices=HardwareKindChoices, read_only=True)
     # Read-only: the module type has a cable assembly profile
     is_assembly = serializers.BooleanField(read_only=True)
+    # Read-only: the cable of a cable assembly, managed by the plugin
+    assembly_cable = CableSerializer(nested=True, read_only=True)
     device_type = DeviceTypeSerializer(
         nested=True,
         required=False,
@@ -163,6 +166,7 @@ class AssetSerializer(PrimaryModelSerializer):
             'status',
             'kind',
             'is_assembly',
+            'assembly_cable',
             'role',
             'device_type',
             'device',
