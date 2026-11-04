@@ -248,8 +248,16 @@ Ends* panel and as `assembly_cable` in the API):
   the label of a NetBox cable type such as `Direct Attach Copper (Passive)`
   (the module type form shows the values of the profile as they are, so
   profiles list the labels; the NetBox value `dac-passive` works too), and
-  `length` in meters. The status is `connected` and the label is the asset
-  tag (or the name) when the cable is created.
+  `length` in meters. The status is `connected`.
+- **Label:** set once, when the cable is created: `<name> [<serial>]`, for
+  example `DAC [SN123]`. The name is the asset name, or the name of the
+  profile if the asset has no name (`Breakout QSFP+ - 4xSFP+ [SN123]`).
+  Without a serial number the label is the name only; if the label would be
+  longer than 100 characters (the NetBox limit), it is the name only, cut to
+  100 characters. The asset tag is not used. Later changes of the asset do
+  not change the label, and it can be edited in NetBox. A cable that is
+  deleted (no end left on one side) gets a new label when it is created
+  again.
 - **Cable profile:** `1C1P` for 1 + 1 ends, `1CNP:NC1P breakout` for 1 + N
   ends (or the profile key `x-cable-profile`). Side B ends are terminated in
   the order of the slots, so NetBox traces each channel of a breakout cable

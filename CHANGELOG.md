@@ -13,6 +13,10 @@ All notable changes to netbox-assets. The versions follow
   table of the labels (from NetBox 4.7.4) and maps them to the NetBox cable
   types; the NetBox values (`dac-passive`) are accepted too. The example
   profiles use the labels.
+- The label of a new cable of a cable assembly is `<name> [<serial>]`: the
+  asset name (or the profile name if the asset has no name) and the serial
+  number, instead of the asset tag. It is still set only when the cable is
+  created.
 
 ### Removed
 

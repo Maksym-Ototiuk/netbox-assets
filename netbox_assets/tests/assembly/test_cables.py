@@ -7,7 +7,7 @@ from django.test import SimpleTestCase
 from django.urls import reverse
 
 from dcim.choices import CableTypeChoices
-from dcim.models import Cable, Interface, ModuleType
+from dcim.models import Cable, Interface, ModuleType, ModuleTypeProfile
 from utilities.exceptions import AbortRequest
 from utilities.testing import TestCase
 
@@ -17,6 +17,7 @@ from netbox_assets.assembly import (
     get_cable_type,
     validate_assembly_schema,
 )
+from netbox_assets.cables import get_cable_label
 from netbox_assets.models import Asset, AssetModuleEnd
 from netbox_assets.tests.assembly.utils import (
     BREAKOUT_SCHEMA,
@@ -72,6 +73,42 @@ class CableSchemaTestCase(SimpleTestCase):
         self.assertEqual(
             set(CABLE_TYPE_LABELS) - set(CableTypeChoices.values()), set()
         )
+
+
+class CableLabelTestCase(SimpleTestCase):
+    def label(self, name='', serial=None, asset_tag=None):
+        profile = ModuleTypeProfile(name='Breakout QSFP+ - 4xSFP+')
+        asset = Asset(
+            name=name,
+            serial=serial,
+            asset_tag=asset_tag,
+            module_type=ModuleType(model='BRK-1M-A', profile=profile),
+        )
+        return get_cable_label(asset)
+
+    def test_name_and_serial(self):
+        self.assertEqual(self.label('DAC', 'SN123'), 'DAC [SN123]')
+        self.assertEqual(self.label(' DAC ', ' SN123 '), 'DAC [SN123]')
+        self.assertEqual(self.label('DAC'), 'DAC')
+        self.assertEqual(self.label('DAC', ''), 'DAC')
+
+    def test_profile_name(self):
+        # without an asset name, the name of the profile is used
+        self.assertEqual(
+            self.label('', 'SN123'), 'Breakout QSFP+ - 4xSFP+ [SN123]'
+        )
+        self.assertEqual(self.label('  '), 'Breakout QSFP+ - 4xSFP+')
+
+    def test_asset_tag_not_used(self):
+        self.assertEqual(self.label('DAC', asset_tag='T-1'), 'DAC')
+        self.assertEqual(self.label(asset_tag='T-1'), 'Breakout QSFP+ - 4xSFP+')
+
+    def test_too_long(self):
+        # 100 characters at most (Cable.label), without the serial number
+        name = 'n' * 90
+        self.assertEqual(self.label(name, 'S' * 7), f'{name} [{"S" * 7}]')
+        self.assertEqual(self.label(name, 'S' * 8), name)
+        self.assertEqual(self.label('n' * 128, 'SN123'), 'n' * 100)
 
 
 class AssemblyCableTestCase(AssemblyFixtures, TestCase):
@@ -137,7 +174,8 @@ class AssemblyCableTestCase(AssemblyFixtures, TestCase):
         self.assertEqual(cable.length, Decimal('1.00'))
         self.assertEqual(cable.length_unit, 'm')
         self.assertEqual(cable.status, 'connected')
-        self.assertEqual(cable.label, 'T-DAC001')
+        # the asset has no name: profile name and serial number
+        self.assertEqual(cable.label, 'DAC SFP+ - SFP+ [DAC001]')
         self.assertEqual(
             self.terminations(cable), (['switch1:Port 1'], ['switch2:Port 1'])
         )
@@ -145,6 +183,20 @@ class AssemblyCableTestCase(AssemblyFixtures, TestCase):
         end_b.delete()
         self.assertIsNone(self.cable_of(self.dac))
         self.assertFalse(Cable.objects.exists())
+
+    def test_label_set_once(self):
+        self.dac.name = 'DAC'
+        self.dac.save()
+        self.install(self.dac, self.device1, 1, 'SFP+ A')
+        self.install(self.dac, self.device2, 1, 'SFP+ B')
+        self.assertEqual(self.cable_of(self.dac).label, 'DAC [DAC001]')
+
+        self.dac.snapshot()
+        self.dac.name = 'DAC renamed'
+        self.dac.serial = 'DAC999'
+        self.dac.full_clean()
+        self.dac.save()
+        self.assertEqual(self.cable_of(self.dac).label, 'DAC [DAC001]')
 
     #
     # Breakout: one cable from the side A end to all side B ends

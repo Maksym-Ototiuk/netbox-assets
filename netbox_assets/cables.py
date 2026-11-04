@@ -9,6 +9,7 @@ the interfaces of the end modules with one NetBox cable (Asset.assembly_cable):
   slots (NetBox derives the cable connector from this order);
 - type and length come from the module type attributes `cable_type` (the
   label or the value of a NetBox cable type) and `length` (meters);
+- the label is set once, when the cable is created (see get_cable_label());
 - the cable profile is the profile of the assembly (e.g. 1C4P:4C1P breakout),
   but only if the installed ends of each side are the first slots of the side
   without a gap. With a gap (e.g. B1 and B3 installed) NetBox would map B3 to
@@ -37,6 +38,7 @@ __all__ = (
     'CABLE_LOCKED_FIELDS',
     'assembly_cable_sync',
     'count_end_interfaces',
+    'get_cable_label',
     'get_cable_values',
     'get_end_interface',
     'in_assembly_cable_sync',
@@ -101,6 +103,22 @@ def get_cable_values(asset):
         if length is not None
         else None,
     }
+
+
+def get_cable_label(asset):
+    """
+    Label of a new cable: "<name> [<serial>]", or only the name if the asset
+    has no serial number or the label would be too long. The name is the
+    asset name, or the name of the assembly profile if the asset has no name.
+    The asset tag is not used.
+    """
+    max_length = Cable._meta.get_field('label').max_length
+    name = (asset.name or '').strip() or asset.module_type.profile.name
+    serial = (asset.serial or '').strip()
+    label = f'{name} [{serial}]' if serial else name
+    if len(label) > max_length:
+        label = name[:max_length]
+    return label
 
 
 def _check_permission(action, asset, check_permissions):
@@ -184,7 +202,7 @@ def sync_assembly_cable(asset, check_permissions=True):
             a_terminations=a_terminations,
             b_terminations=b_terminations,
             status=LinkStatusChoices.STATUS_CONNECTED,
-            label=asset.asset_tag or asset.name or '',
+            label=get_cable_label(asset),
             **values,
         )
         _save_cable(cable, asset)
