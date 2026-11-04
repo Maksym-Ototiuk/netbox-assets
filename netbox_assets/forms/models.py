@@ -274,6 +274,19 @@ class AssetModuleEndForm(NetBoxModelForm):
     class Meta:
         model = AssetModuleEnd
         fields = ('asset', 'label', 'is_primary', 'tags')
+        help_texts = {
+            'is_primary': 'Primary end of the cable assembly. The assembly is shown where '
+            'its primary end is installed: the Installed Location and the Primary End '
+            'on the asset page, and the Hardware, Installed Site, Installed Device, … '
+            'columns (and their sorting) in the asset list. Filters such as installed '
+            'site or installed device match any installed end. If '
+            '<code>sync_hardware_serial_asset_tag</code> is enabled, the serial number '
+            'is written to the modules of all ends, and the asset tag only to the '
+            'module of the primary end (asset tags of modules are unique in NetBox); '
+            'if it is disabled, nothing is written to the modules. If not checked, '
+            'the first installed end and the end in the first side A slot become '
+            'primary automatically.',
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -48,7 +48,9 @@ class AssetModuleEnd(NetBoxModel):
     is_primary = models.BooleanField(
         default=False,
         verbose_name='Primary',
-        help_text='The asset tag is synchronized to the primary end only',
+        help_text='The cable assembly is shown where its primary end is installed. '
+        'If serial and asset tag sync is enabled, the asset tag is written to the '
+        'module of the primary end only.',
     )
 
     clone_fields = ('asset',)

@@ -34,7 +34,7 @@
           <th>Module</th>
           <th>Interfaces</th>
           <th>Cable</th>
-          <th>Primary</th>
+          <th>Primary {% include 'netbox_assets/inc/primary_end_help.html' %}</th>
           <th></th>
         </tr>
       </thead>
@@ -72,7 +72,7 @@
                 {% if perms.netbox_assets.change_assetmoduleend and not row.end.is_primary %}
                   <form method="post" action="{% url 'plugins:netbox_assets:assetmoduleend_set_primary' pk=row.end.pk %}?return_url={{ object.get_absolute_url|urlencode }}%23assembly-ends" class="d-inline">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Make primary end">
+                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Make primary end: the assembly is shown where this end is installed, and the asset tag is written to its module (if sync is enabled)">
                       <i class="mdi mdi-star-outline" aria-hidden="true"></i>
                     </button>
                   </form>

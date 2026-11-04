@@ -26,7 +26,7 @@
       <td><a href="{{ end.get_absolute_url }}">{{ end.label }}</a> (side {{ end.side }})</td>
     </tr>
     <tr>
-      <th scope="row">Primary</th>
+      <th scope="row">Primary {% include 'netbox_assets/inc/primary_end_help.html' %}</th>
       <td>{% checkmark end.is_primary %}</td>
     </tr>
     <tr>

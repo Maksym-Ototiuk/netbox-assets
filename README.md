@@ -219,16 +219,26 @@ To keep existing cable assemblies valid, the plugin refuses:
 - **Status:** a cable assembly becomes `used` when its first end is installed
   and `stored` when its last end is removed (the same settings as for other
   assets, see [Settings](#settings)).
-- **Primary end:** the end in the first side A slot is the primary end. If it
-  is not installed, the first installed end (in the order of the profile) is
-  the primary end. You can make another end primary (*Make primary* button);
-  if the primary end is removed, the next end becomes primary.
-- **Location:** a cable assembly is shown where its primary end is installed
-  (`installed_site`, `installed_device` and so on). Filters for the installed
-  site, location, rack and device match any installed end.
+- **Primary end:** an asset normally has one place, a cable assembly has
+  several ends. The primary end defines where the assembly is shown and, if
+  synchronization is enabled, where its asset tag is written (see below). The
+  end in the first side A slot is the primary end. If it is not installed,
+  the first installed end (in the order of the profile) is the primary end.
+  You can make another end primary (*Make primary* button); if the primary
+  end is removed, the next end becomes primary. The asset page, the page of
+  an end, the module page and the Install form explain this in a tooltip or
+  a help text.
+- **Location:** a cable assembly is shown where its primary end is installed:
+  the *Installed Location* block and the *Primary End* row on the asset page,
+  and the *Hardware*, *Installed Site*, *Installed Device*, … columns (and
+  their sorting) in the asset list (`installed_site`, `installed_device` and
+  so on). Filters for the installed site, location, rack and device match any
+  installed end, not only the primary one.
 - **Synchronization** (when `sync_hardware_serial_asset_tag` is enabled): the
   serial number is copied to the modules of all ends, the asset tag only to
   the module of the primary end (asset tags of modules are unique in NetBox).
+  If synchronization is disabled, nothing is written to the modules, and the
+  primary end only defines the location.
   Serial and asset tag can then be changed only on the asset. They are
   cleared from a module when its end is uninstalled. When the asset itself is
   deleted, the values stay on the modules, as for other assets.

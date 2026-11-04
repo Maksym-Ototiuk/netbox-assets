@@ -70,6 +70,8 @@ class AssemblyViewsTestCase(AssemblyFixtures, TestCase):
     Asset and module pages of cable assemblies, install and set primary actions
     """
 
+    PRIMARY_HELP = 'Primary end of the cable assembly.'
+
     def setUp(self):
         super().setUp()
         self.user.is_superuser = True
@@ -82,32 +84,48 @@ class AssemblyViewsTestCase(AssemblyFixtures, TestCase):
     def test_asset_page(self):
         module = self.create_module(self.device1, 1, self.breakout_a_type)
         AssetModuleEnd.objects.create(asset=self.breakout, module=module, label='A')
+        module = self.create_module(self.device2, 1, self.breakout_b_type)
+        AssetModuleEnd.objects.create(asset=self.breakout, module=module, label='B1')
         response = self.client.get(self.breakout.get_absolute_url())
         self.assertHttpStatus(response, 200)
         content = response.content.decode()
         self.assertIn('Assembly Ends', content)
         self.assertIn('Uninstall', content)
-        # four side B ends are not installed yet
-        self.assertEqual(content.count('Not installed'), 4)
+        # three side B ends are not installed yet
+        self.assertEqual(content.count('Not installed'), 3)
         self.assertIn('label=B4', content)
         self.assertIn('Port 1', content)
+        # Primary End row and Primary column, Make primary button of B1
+        self.assertEqual(content.count(self.PRIMARY_HELP), 2)
+        self.assertEqual(content.count('Make primary end:'), 1)
+
+    def test_end_page(self):
+        module = self.create_module(self.device1, 1, self.breakout_a_type)
+        end = AssetModuleEnd.objects.create(
+            asset=self.breakout, module=module, label='A'
+        )
+        response = self.client.get(end.get_absolute_url())
+        self.assertHttpStatus(response, 200)
+        self.assertIn(self.PRIMARY_HELP, response.content.decode())
 
     def test_module_page(self):
         module = self.create_module(self.device1, 1, self.breakout_a_type)
         AssetModuleEnd.objects.create(asset=self.breakout, module=module, label='A')
         response = self.client.get(module.get_absolute_url())
         self.assertHttpStatus(response, 200)
-        self.assertIn('Cable Assembly', response.content.decode())
+        content = response.content.decode()
+        self.assertIn('Cable Assembly', content)
+        self.assertIn(self.PRIMARY_HELP, content)
 
     def test_install_form(self):
         url = reverse('plugins:netbox_assets:assetmoduleend_add')
         response = self.client.get(f'{url}?asset={self.breakout.pk}&label=B2')
         self.assertHttpStatus(response, 200)
+        content = response.content.decode()
         # module type of side B ends is preselected
-        self.assertRegex(
-            response.content.decode(),
-            rf'value="{self.breakout_b_type.pk}"\s+selected',
-        )
+        self.assertRegex(content, rf'value="{self.breakout_b_type.pk}"\s+selected')
+        # help text of the primary end
+        self.assertIn('<code>sync_hardware_serial_asset_tag</code>', content)
 
     @override_settings(PLUGINS_CONFIG=CONFIG_SYNC_ON)
     def test_install_creates_module(self):

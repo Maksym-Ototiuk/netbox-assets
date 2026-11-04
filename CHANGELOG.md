@@ -5,6 +5,13 @@ All notable changes to netbox-assets. The versions follow
 
 ## 1.2.1 (unreleased)
 
+### Added
+
+- Explanations of the primary end of a cable assembly: tooltips in the
+  *Assembly Ends* panel (*Primary* column, *Make primary* button), on the
+  *Primary End* row of the asset page, on the page of an end and in the
+  *Cable Assembly* panel of a module, and a help text in the Install form.
+
 ### Changed
 
 - The module type attribute `cable_type` of cable assemblies takes the label

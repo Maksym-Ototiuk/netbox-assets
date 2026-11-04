@@ -133,7 +133,7 @@
           </tr>
           {% if object.is_assembly %}
             <tr>
-              <th scope="row">Primary End</th>
+              <th scope="row">Primary End {% include 'netbox_assets/inc/primary_end_help.html' %}</th>
               <td>{{ object.hardware|linkify|placeholder }}</td>
             </tr>
           {% else %}

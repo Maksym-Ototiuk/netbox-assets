@@ -21,11 +21,17 @@ __all__ = (
 )
 
 
+class PrimaryEndAttr(attrs.BooleanAttr):
+    """The primary flag of an end, with the explanation of the primary end."""
+
+    template_name = 'netbox_assets/inc/primary_end_attr.html'
+
+
 class AssetModuleEndPanel(panels.ObjectAttributesPanel):
     asset = attrs.RelatedObjectAttr('asset', linkify=True, label='Cable assembly')
     label = attrs.TextAttr('label', label='End')
     side = attrs.TextAttr('side')
-    is_primary = attrs.BooleanAttr('is_primary', label='Primary')
+    is_primary = PrimaryEndAttr('is_primary', label='Primary')
     device = attrs.RelatedObjectAttr('module.device', linkify=True, label='Device')
     module_bay = attrs.RelatedObjectAttr(
         'module.module_bay', linkify=True, label='Module bay'
