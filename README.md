@@ -23,20 +23,6 @@ NetBox.
 
 The goal is simple record keeping, not full inventory management.
 
-## Differences from netbox-inventory
-
-| Feature                           | netbox-inventory              | netbox-assets                                    |
-| --------------------------------- | ----------------------------- | ------------------------------------------------ |
-| Assets                            | Yes                           | Yes                                              |
-| Asset roles (hierarchical)        | Yes (django-mptt)             | Yes (PostgreSQL `ltree`, native to NetBox 4.7)   |
-| Asset kinds: device, module, rack | Yes                           | Yes                                              |
-| Asset kind: inventory item        | Yes                           | Removed (inventory items are deprecated in NetBox since v4.3) |
-| Inventory item types and groups   | Yes                           | Removed                                          |
-| Suppliers, purchases, deliveries  | Yes                           | Removed                                          |
-| Warranty tracking                 | Yes                           | Removed                                          |
-| Audit flows and audit trails      | Yes                           | Removed                                          |
-| Navigation menu                   | "Inventory" (configurable)    | Always a top-level "Assets" menu                 |
-
 ## Limitations
 
 - **Cannot be installed together with netbox-inventory.** Both plugins define
