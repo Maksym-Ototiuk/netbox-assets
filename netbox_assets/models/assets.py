@@ -1,11 +1,16 @@
+from urllib.parse import urlencode
+
 from django.db import models
 from django.forms import ValidationError
+from django.urls import reverse
 
+from dcim.models import ModuleType
 from netbox.models import PrimaryModel
 from netbox.models.features import ImageAttachmentsMixin
 
 from ..assembly import (
     SIDE_A,
+    SIDE_B,
     SIDE_BOTH,
     get_assembly_spec,
     get_module_type_side,
@@ -249,6 +254,42 @@ class Asset(PrimaryModel, ImageAttachmentsMixin):
         if not self.module_type_id:
             return None
         return get_assembly_spec(self.module_type)
+
+    def is_side_b_module_type(self, module_type):
+        """
+        Can modules of module_type be side B ends of this cable assembly? They
+        must be of a side B module type with the profile and the manufacturer
+        of the asset's module type.
+        """
+        return (
+            module_type.profile_id == self.module_type.profile_id
+            and module_type.manufacturer_id == self.module_type.manufacturer_id
+            and get_module_type_side(module_type) == SIDE_B
+        )
+
+    def get_side_b_module_types(self):
+        """Module types for the side B ends, see is_side_b_module_type()."""
+        return ModuleType.objects.filter(
+            profile=self.module_type.profile_id,
+            manufacturer=self.module_type.manufacturer_id,
+            attribute_data__side=SIDE_B,
+        )
+
+    def get_side_b_module_type_add_url(self):
+        """
+        URL of the NetBox form for a new side B module type of this cable
+        assembly, prefilled from the asset's module type.
+        """
+        data = self.module_type.attribute_data or {}
+        params = {
+            'profile': self.module_type.profile_id,
+            'manufacturer': self.module_type.manufacturer_id,
+            'attr_side': SIDE_B,
+        }
+        for name in ('cable_type', 'length'):
+            if data.get(name) is not None:
+                params[f'attr_{name}'] = data[name]
+        return f'{reverse("dcim:moduletype_add")}?{urlencode(params)}'
 
     @property
     def primary_end(self):

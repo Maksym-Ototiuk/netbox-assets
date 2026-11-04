@@ -154,7 +154,7 @@ class AssetModuleEnd(NetBoxModel):
         """
         Side A ends (and both ends of a symmetric assembly) must be modules of
         the asset's module type. Side B ends must be modules of a side B
-        module type with the same profile.
+        module type with the same profile and manufacturer.
         """
         module_type = module.module_type
         symmetric = get_module_type_side(asset.module_type) == SIDE_BOTH
@@ -163,15 +163,10 @@ class AssetModuleEnd(NetBoxModel):
                 raise ValidationError(
                     f'End {slot.label} of {asset} must be a module of type '
                     f'{asset.module_type}, not {module_type}.'
+                    f'{self._installed_module_hint(module)}'
                 )
-        elif (
-            module_type.profile_id != asset.module_type.profile_id
-            or get_module_type_side(module_type) != slot.side
-        ):
-            raise ValidationError(
-                f'End {slot.label} of {asset} must be a module of a side '
-                f'{slot.side} module type with profile {asset.module_type.profile}.'
-            )
+        elif not asset.is_side_b_module_type(module_type):
+            raise ValidationError(self._side_b_module_type_error(asset, slot, module))
         if module.pk:
             from .assets import Asset
 
@@ -181,6 +176,39 @@ class AssetModuleEnd(NetBoxModel):
                     f'Module {module} is already assigned to asset {assigned}.'
                 )
         self.validate_module_interface(asset, module)
+
+    @staticmethod
+    def _installed_module_hint(module):
+        # an existing module: the module bay is not empty
+        if not module.pk:
+            return ''
+        return (
+            f' Module bay {module.module_bay} already has a module of type '
+            f'{module.module_type}: use an empty module bay or a module of the '
+            f'right type.'
+        )
+
+    def _side_b_module_type_error(self, asset, slot, module):
+        """Error for a side B end whose module has a wrong module type."""
+        module_type = module.module_type
+        profile = asset.module_type.profile
+        manufacturer = asset.module_type.manufacturer
+        message = (
+            f'End {slot.label} of {asset} must be a module of a side B module '
+            f'type with profile {profile} and manufacturer {manufacturer}, not '
+            f'{module_type} (profile {module_type.profile or "none"}, side '
+            f'{get_module_type_side(module_type) or "none"}, manufacturer '
+            f'{module_type.manufacturer}).'
+        )
+        matching = [str(m) for m in asset.get_side_b_module_types()]
+        if matching:
+            message += f' Side B module types: {", ".join(matching)}.'
+        else:
+            message += (
+                ' There is no such module type: create one with this profile '
+                'and manufacturer and the attribute side B.'
+            )
+        return message + self._installed_module_hint(module)
 
     def validate_module_interface(self, asset, module):
         """

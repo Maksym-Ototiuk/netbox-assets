@@ -21,6 +21,21 @@
         installed, so NetBox cannot trace the single channels.
       </div>
     {% endif %}
+    {% if assembly_side_b_module_type_missing %}
+      <div class="alert alert-warning mt-2 mb-0" role="alert">
+        <i class="mdi mdi-alert" aria-hidden="true"></i>
+        There is no side B module type with profile
+        {{ object.module_type.profile|linkify }} and manufacturer
+        {{ object.module_type.manufacturer|linkify }}, so the side B ends cannot
+        be installed. Create a module type with this profile and manufacturer
+        and the attribute side B.
+        {% if perms.dcim.add_moduletype %}
+          <a href="{{ object.get_side_b_module_type_add_url }}" class="btn btn-sm btn-warning ms-1">
+            <i class="mdi mdi-plus-thick" aria-hidden="true"></i> Create Module Type
+          </a>
+        {% endif %}
+      </div>
+    {% endif %}
   </div>
   {% if assembly_slots %}
   <div class="table-responsive">

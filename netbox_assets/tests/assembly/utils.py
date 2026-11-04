@@ -113,9 +113,11 @@ class AssemblyFixtures:
         cls.device2 = cls.create_device('switch2')
 
     @classmethod
-    def create_module_type(cls, model, profile, side, interface_type, channels=None):
+    def create_module_type(
+        cls, model, profile, side, interface_type, channels=None, manufacturer=None
+    ):
         module_type = ModuleType.objects.create(
-            manufacturer=cls.manufacturer,
+            manufacturer=manufacturer or cls.manufacturer,
             model=model,
             profile=profile,
             attribute_data={
@@ -140,6 +142,23 @@ class AssemblyFixtures:
                 channel_id=channel,
             )
         return module_type
+
+    @classmethod
+    def create_other_breakout(cls):
+        """
+        Breakout assembly of another manufacturer, which has no side B module
+        type (the side B type of the fixtures is of the first manufacturer).
+        """
+        manufacturer = Manufacturer.objects.create(name='Other', slug='other')
+        module_type = cls.create_module_type(
+            'OTHER-A',
+            cls.breakout_profile,
+            'A',
+            '40gbase-x-qsfpp',
+            channels=4,
+            manufacturer=manufacturer,
+        )
+        return cls.create_assembly(module_type=module_type, serial='OTHER001')
 
     @classmethod
     def create_device(cls, name, bays=6):

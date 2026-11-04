@@ -71,6 +71,7 @@ class AssemblyViewsTestCase(AssemblyFixtures, TestCase):
     """
 
     PRIMARY_HELP = 'Primary end of the cable assembly.'
+    SIDE_B_WARNING = 'There is no side B module type with profile'
 
     def setUp(self):
         super().setUp()
@@ -98,6 +99,15 @@ class AssemblyViewsTestCase(AssemblyFixtures, TestCase):
         # Primary End row and Primary column, Make primary button of B1
         self.assertEqual(content.count(self.PRIMARY_HELP), 2)
         self.assertEqual(content.count('Make primary end:'), 1)
+        self.assertNotIn(self.SIDE_B_WARNING, content)
+
+    def test_asset_page_without_side_b_module_type(self):
+        asset = self.create_other_breakout()
+        response = self.client.get(asset.get_absolute_url())
+        self.assertHttpStatus(response, 200)
+        content = response.content.decode()
+        self.assertIn(self.SIDE_B_WARNING, content)
+        self.assertIn('Create Module Type', content)
 
     def test_end_page(self):
         module = self.create_module(self.device1, 1, self.breakout_a_type)
@@ -126,6 +136,31 @@ class AssemblyViewsTestCase(AssemblyFixtures, TestCase):
         self.assertRegex(content, rf'value="{self.breakout_b_type.pk}"\s+selected')
         # help text of the primary end
         self.assertIn('<code>sync_hardware_serial_asset_tag</code>', content)
+        self.assertNotIn(self.SIDE_B_WARNING, content)
+
+    def test_install_form_without_side_b_module_type(self):
+        asset = self.create_other_breakout()
+        url = reverse('plugins:netbox_assets:assetmoduleend_add')
+        response = self.client.get(f'{url}?asset={asset.pk}&label=B2')
+        self.assertHttpStatus(response, 200)
+        content = response.content.decode()
+        self.assertIn(self.SIDE_B_WARNING, content)
+        self.assertIn('Create a side B module type', content)
+        # no warning for the side A end
+        response = self.client.get(f'{url}?asset={asset.pk}&label=A')
+        self.assertNotIn(self.SIDE_B_WARNING, response.content.decode())
+
+    def test_side_b_module_type_add_form(self):
+        # the NetBox module type form is prefilled from the asset's module type
+        response = self.client.get(self.breakout.get_side_b_module_type_add_url())
+        self.assertHttpStatus(response, 200)
+        content = response.content.decode()
+        self.assertRegex(content, rf'value="{self.breakout_profile.pk}"\s+selected')
+        self.assertRegex(content, r'value="B"\s+selected')
+        self.assertIn(
+            'name="attr_cable_type" value="Direct Attach Copper (Passive)"', content
+        )
+        self.assertIn('name="attr_length" value="1"', content)
 
     @override_settings(PLUGINS_CONFIG=CONFIG_SYNC_ON)
     def test_install_creates_module(self):

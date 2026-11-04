@@ -1,9 +1,11 @@
 from copy import deepcopy
+from urllib.parse import parse_qs, urlsplit
 
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.urls import reverse
 
-from dcim.models import Module
+from dcim.models import Manufacturer, Module
 from utilities.exceptions import AbortRequest
 
 from netbox_assets.assembly import AssemblySpec, validate_assembly_schema
@@ -145,6 +147,57 @@ class AssemblyModelTestCase(AssemblyFixtures, TestCase):
         module = self.create_module(self.device1, 1, self.breakout_a_type)
         with self.assertRaisesMessage(ValidationError, 'side B module type'):
             self.install(self.breakout, module, label='B1')
+
+    def test_side_b_end_error(self):
+        # the error explains the module type and lists the side B module types
+        module = self.create_module(self.device1, 1, self.breakout_a_type)
+        with self.assertRaises(ValidationError) as cm:
+            self.install(self.breakout, module, label='B1')
+        message = cm.exception.messages[0]
+        self.assertIn(
+            'must be a module of a side B module type with profile Breakout '
+            'QSFP+ - 4xSFP+ and manufacturer Cables Inc, not BRK-1M-A (profile '
+            'Breakout QSFP+ - 4xSFP+, side A, manufacturer Cables Inc).',
+            message,
+        )
+        self.assertIn('Side B module types: BRK-1M-B.', message)
+        self.assertIn('Module bay Bay 1 already has a module of type BRK-1M-A', message)
+
+    def test_side_b_end_must_have_same_manufacturer(self):
+        manufacturer = Manufacturer.objects.create(name='Other', slug='other')
+        module_type = self.create_module_type(
+            'OTHER-B',
+            self.breakout_profile,
+            'B',
+            '10gbase-x-sfpp',
+            manufacturer=manufacturer,
+        )
+        self.assertFalse(self.breakout.is_side_b_module_type(module_type))
+        self.assertTrue(self.breakout.is_side_b_module_type(self.breakout_b_type))
+        module = self.create_module(self.device1, 1, module_type)
+        with self.assertRaisesMessage(ValidationError, 'side B, manufacturer Other)'):
+            self.install(self.breakout, module, label='B1')
+
+    def test_side_b_module_type_missing(self):
+        asset = self.create_other_breakout()
+        self.assertFalse(asset.get_side_b_module_types().exists())
+        module = self.create_module(self.device1, 1, self.breakout_b_type)
+        with self.assertRaisesMessage(ValidationError, 'There is no such module type'):
+            self.install(asset, module, label='B1')
+
+    def test_side_b_module_type_add_url(self):
+        url = urlsplit(self.breakout.get_side_b_module_type_add_url())
+        self.assertEqual(url.path, reverse('dcim:moduletype_add'))
+        self.assertEqual(
+            parse_qs(url.query),
+            {
+                'profile': [str(self.breakout_profile.pk)],
+                'manufacturer': [str(self.manufacturer.pk)],
+                'attr_side': ['B'],
+                'attr_cable_type': ['Direct Attach Copper (Passive)'],
+                'attr_length': ['1'],
+            },
+        )
 
     def test_symmetric_end_must_be_asset_module_type(self):
         module = self.create_module(self.device1, 1, self.breakout_b_type)

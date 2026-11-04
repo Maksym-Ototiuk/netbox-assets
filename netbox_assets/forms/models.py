@@ -1,5 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils.html import format_html
 
 from dcim.models import (
     Device,
@@ -328,21 +329,39 @@ class AssetModuleEndForm(NetBoxModelForm):
             profile=module_type.profile_id
         )
         query_params = {'profile_id': module_type.profile_id}
-        slot = spec.get_slot(self.initial.get('label') or self.instance.label)
+        label = self.data.get('label') if self.is_bound else None
+        slot = spec.get_slot(label or self.initial.get('label') or self.instance.label)
         if slot and (slot.side == SIDE_A or get_module_type_side(module_type) == SIDE_BOTH):
             self.initial.setdefault('module_type', module_type.pk)
         elif slot and slot.side == SIDE_B:
             query_params.update(
                 {'attr_side': SIDE_B, 'manufacturer_id': module_type.manufacturer_id}
             )
-            candidates = ModuleType.objects.filter(
-                profile=module_type.profile_id,
-                manufacturer=module_type.manufacturer_id,
-                attribute_data__side=SIDE_B,
-            )
-            if len(candidates[:2]) == 1:
+            candidates = list(asset.get_side_b_module_types()[:2])
+            if len(candidates) == 1:
                 self.initial.setdefault('module_type', candidates[0].pk)
+            elif not candidates:
+                self.fields['module_type'].help_text = self._side_b_warning(asset)
         self.fields['module_type'].widget.add_query_params(query_params)
+
+    @staticmethod
+    def _side_b_warning(asset):
+        """Help text of the module type field if there is no side B module type."""
+        request = current_request.get()
+        create = ''
+        if request is not None and request.user.has_perm('dcim.add_moduletype'):
+            create = format_html(
+                ' <a href="{}" target="_blank" rel="noopener">Create a side B module type</a>.',
+                asset.get_side_b_module_type_add_url(),
+            )
+        return format_html(
+            '<span class="text-warning"><i class="mdi mdi-alert" aria-hidden="true"></i> '
+            'There is no side B module type with profile {} and manufacturer {}, so '
+            'the side B ends cannot be installed.{}</span>',
+            asset.module_type.profile,
+            asset.module_type.manufacturer,
+            create,
+        )
 
     def _get_asset(self):
         value = self.data.get('asset') if self.is_bound else None

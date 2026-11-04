@@ -11,6 +11,9 @@ All notable changes to netbox-assets. The versions follow
   *Assembly Ends* panel (*Primary* column, *Make primary* button), on the
   *Primary End* row of the asset page, on the page of an end and in the
   *Cable Assembly* panel of a module, and a help text in the Install form.
+- A warning in the *Assembly Ends* panel and in the Install form when a
+  breakout cable has no side B module type, with a link to the module type
+  form, prefilled with the profile, the manufacturer and the attributes.
 
 ### Changed
 
@@ -24,6 +27,10 @@ All notable changes to netbox-assets. The versions follow
   asset name (or the profile name if the asset has no name) and the serial
   number, instead of the asset tag. It is still set only when the cable is
   created.
+- Side B ends must be modules of a side B module type with the same profile
+  and the same manufacturer as the asset's module type (before: the same
+  profile). The error for a wrong module type names the module type, its
+  profile, side and manufacturer, and lists the matching module types.
 
 ### Removed
 

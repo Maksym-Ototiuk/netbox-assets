@@ -5,6 +5,7 @@ from netbox.views import generic
 from utilities.views import register_model_view
 
 from .. import filtersets, forms, models, tables
+from ..assembly import SIDE_A, get_module_type_side
 
 __all__ = (
     'AssetView',
@@ -33,6 +34,13 @@ class AssetView(generic.ObjectView):
             # cannot trace the single channels
             'assembly_cable_without_profile': bool(
                 spec and cable and spec.cable_profile and not cable.profile
+            ),
+            # side B ends need a side B module type
+            'assembly_side_b_module_type_missing': bool(
+                spec
+                and spec.b_ends
+                and get_module_type_side(instance.module_type) == SIDE_A
+                and not instance.get_side_b_module_types().exists()
             ),
         }
 

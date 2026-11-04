@@ -197,7 +197,10 @@ An end can be installed only if:
 - the end exists in the profile and is not installed yet;
 - the module has the right module type: side A ends (and both ends of a
   symmetric assembly) must be modules of the asset's module type; side B ends
-  must be modules of a side `B` module type with the same profile;
+  must be modules of a side `B` module type with the same profile and the
+  same manufacturer as the asset's module type. If there is no such module
+  type, the *Assembly Ends* panel and the Install form show a warning with a
+  link to create it;
 - the module is not assigned to another asset (and an end module cannot be
   assigned to another asset).
 
