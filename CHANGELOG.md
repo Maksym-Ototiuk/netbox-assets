@@ -38,6 +38,13 @@ All notable changes to netbox-assets. The versions follow
   the *Assembly Ends* panel of the asset page; the list of all ends and its
   import are still available at `/plugins/assets/assembly-ends/`.
 
+### Fixed
+
+- Installing an end in an empty module bay failed with a server error when
+  the device already had an interface with the name of the new module's
+  interface, or when the module bay had no position for `{module}`. The
+  Install form now shows an error, as the NetBox module form does.
+
 ## 1.2.0 (unreleased)
 
 ### Added

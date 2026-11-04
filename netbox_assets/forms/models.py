@@ -2,6 +2,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.html import format_html
 
+from dcim.constants import MODULE_TOKEN
 from dcim.models import (
     Device,
     DeviceType,
@@ -16,6 +17,7 @@ from dcim.models import (
 from netbox.context import current_request
 from netbox.forms import NestedGroupModelForm, NetBoxModelForm, PrimaryModelForm
 from tenancy.models import Contact, ContactGroup, Tenant
+from utilities.exceptions import AbortRequest
 from utilities.forms import add_blank_choice
 from utilities.forms.fields import DynamicModelChoiceField
 from utilities.forms.rendering import FieldSet
@@ -35,6 +37,20 @@ __all__ = (
     'AssetRoleForm',
     'AssetForm',
     'AssetModuleEndForm',
+)
+
+# component templates of a module type and the components of a device that a
+# new module must not clash with (as in the NetBox module form)
+MODULE_COMPONENTS = (
+    ('consoleporttemplates', 'consoleports'),
+    ('consoleserverporttemplates', 'consoleserverports'),
+    ('interfacetemplates', 'interfaces'),
+    ('powerporttemplates', 'powerports'),
+    ('poweroutlettemplates', 'poweroutlets'),
+    ('coolingintaketemplates', 'coolingintakes'),
+    ('coolingoutflowtemplates', 'coolingoutflows'),
+    ('rearporttemplates', 'rearports'),
+    ('frontporttemplates', 'frontports'),
 )
 
 
@@ -424,8 +440,54 @@ class AssetModuleEndForm(NetBoxModelForm):
             raise ValidationError(
                 {'module_bay': [f'Cannot create module: {m}' for m in e.messages]}
             )
+        self._check_module_components(module)
         self.new_module = module
         return module
+
+    @staticmethod
+    def _check_module_components(module):
+        """
+        Checks of the NetBox module form that Module.full_clean() does not do:
+        a component name with {module} needs a module bay position, and the
+        device must not have a component with the same name yet. Otherwise
+        saving the module fails with a database error.
+        """
+        module_bay = module.module_bay
+        for templates, components in MODULE_COMPONENTS:
+            existing = set(
+                getattr(module.device, components).values_list('name', flat=True)
+            )
+            for template in getattr(module.module_type, templates).all():
+                placeholder = MODULE_TOKEN in template.name
+                if placeholder and not module_bay.position:
+                    raise ValidationError(
+                        {
+                            'module_bay': f'Cannot create module: module bay '
+                            f'{module_bay} has no position, but the component names '
+                            f'of module type {module.module_type} use {MODULE_TOKEN} '
+                            f'(the position of the module bay).'
+                        }
+                    )
+                try:
+                    name = template.resolve_name(module=module)
+                except (AbortRequest, ValueError) as e:
+                    raise ValidationError({'module_bay': f'Cannot create module: {e}'})
+                if name in existing:
+                    hint = (
+                        f' {MODULE_TOKEN} in the component names of module type '
+                        f'{module.module_type} is the position of the module bay '
+                        f'("{module_bay.position}").'
+                        if placeholder
+                        else ''
+                    )
+                    raise ValidationError(
+                        {
+                            'module_bay': f'Cannot create module: device '
+                            f'{module.device} already has '
+                            f'{template.component_model._meta.verbose_name} {name}.'
+                            f'{hint}'
+                        }
+                    )
 
     def save(self, *args, **kwargs):
         if self.new_module is not None:

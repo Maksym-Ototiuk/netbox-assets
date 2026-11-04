@@ -202,7 +202,11 @@ An end can be installed only if:
   type, the *Assembly Ends* panel and the Install form show a warning with a
   link to create it;
 - the module is not assigned to another asset (and an end module cannot be
-  assigned to another asset).
+  assigned to another asset);
+- for an empty module bay, the new module can be created: the module bay has
+  a position if the interface names of the module type use `{module}`, and
+  the device has no interface with the same name yet (the same checks as the
+  NetBox module form).
 
 The number of ends in the profile is a maximum: a cable assembly can have no
 ends installed (in storage) or only some of them.

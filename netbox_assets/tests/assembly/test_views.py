@@ -1,7 +1,7 @@
 from django.test import override_settings
 from django.urls import reverse
 
-from dcim.models import Module
+from dcim.models import Interface, Module, ModuleBay
 from utilities.testing import TestCase, ViewTestCases, create_tags
 
 from netbox_assets.models import AssetModuleEnd
@@ -197,6 +197,41 @@ class AssemblyViewsTestCase(AssemblyFixtures, TestCase):
         )
         self.assertHttpStatus(response, 200)
         self.assertFalse(AssetModuleEnd.objects.exists())
+
+    def post_install(self, bay, label='B1'):
+        return self.client.post(
+            reverse('plugins:netbox_assets:assetmoduleend_add'),
+            {
+                'asset': self.breakout.pk,
+                'label': label,
+                'device': self.device2.pk,
+                'module_bay': bay.pk,
+                'module_type': self.breakout_b_type.pk,
+            },
+        )
+
+    def test_install_interface_name_exists(self):
+        # the module would create interface "Port 1" ("Port {module}")
+        Interface.objects.create(
+            device=self.device2, name='Port 1', type='10gbase-x-sfpp'
+        )
+        response = self.post_install(self.get_bay(self.device2, 1))
+        self.assertHttpStatus(response, 200)
+        self.assertIn(
+            'Cannot create module: device switch2 already has interface Port 1. '
+            '{module} in the component names of module type BRK-1M-B is the '
+            'position of the module bay (&quot;1&quot;).',
+            response.content.decode(),
+        )
+        self.assertFalse(AssetModuleEnd.objects.exists())
+        self.assertFalse(Module.objects.exists())
+
+    def test_install_module_bay_without_position(self):
+        bay = ModuleBay.objects.create(device=self.device2, name='Bay X')
+        response = self.post_install(bay)
+        self.assertHttpStatus(response, 200)
+        self.assertIn('module bay Bay X has no position', response.content.decode())
+        self.assertFalse(Module.objects.exists())
 
     def test_set_primary(self):
         end_a = AssetModuleEnd.objects.create(
