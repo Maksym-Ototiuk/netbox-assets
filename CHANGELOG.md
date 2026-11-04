@@ -5,6 +5,15 @@ All notable changes to netbox-assets. The versions follow
 
 ## 1.2.1 (unreleased)
 
+### Changed
+
+- The module type attribute `cable_type` of cable assemblies takes the label
+  of a NetBox cable type (for example `Direct Attach Copper (Passive)`), so
+  the module type form shows readable cable types. The plugin keeps its own
+  table of the labels (from NetBox 4.7.4) and maps them to the NetBox cable
+  types; the NetBox values (`dac-passive`) are accepted too. The example
+  profiles use the labels.
+
 ### Removed
 
 - The *Assembly Ends* menu item. The ends of a cable assembly are managed in

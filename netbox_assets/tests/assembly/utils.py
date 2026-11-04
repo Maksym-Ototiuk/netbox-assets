@@ -39,7 +39,10 @@ DAC_SCHEMA = {
         'cable_type': {
             'type': 'string',
             'title': 'Cable type',
-            'enum': ['dac-passive', 'dac-active'],
+            'enum': [
+                'Direct Attach Copper (Passive)',
+                'Direct Attach Copper (Active)',
+            ],
         },
         'length': {'type': 'number', 'title': 'Length (m)', 'minimum': 0},
     },
@@ -115,7 +118,11 @@ class AssemblyFixtures:
             manufacturer=cls.manufacturer,
             model=model,
             profile=profile,
-            attribute_data={'side': side, 'cable_type': 'dac-passive', 'length': 1},
+            attribute_data={
+                'side': side,
+                'cable_type': 'Direct Attach Copper (Passive)',
+                'length': 1,
+            },
         )
         parent = InterfaceTemplate.objects.create(
             module_type=module_type,

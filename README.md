@@ -150,7 +150,7 @@ Example profile for a breakout cable:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["A", "B"]},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [4], "default": 4},
-    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active", "aoc"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["Direct Attach Copper (Passive)", "Direct Attach Copper (Active)", "Active Optical Cabling (AOC)"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
   "required": ["side", "cable_type", "length"]
@@ -244,10 +244,12 @@ Ends* panel and as `assembly_cable` in the API):
   installed, between the interfaces of their modules (the only interface of
   the module that is not a channel subinterface; for a breakout QSFP end, the
   channelized interface).
-- **Type and length** come from the module type of the asset (`cable_type`, a
-  NetBox cable type such as `dac-passive`, and `length` in meters). The
-  status is `connected` and the label is the asset tag (or the name) when the
-  cable is created.
+- **Type and length** come from the module type of the asset: `cable_type`,
+  the label of a NetBox cable type such as `Direct Attach Copper (Passive)`
+  (the module type form shows the values of the profile as they are, so
+  profiles list the labels; the NetBox value `dac-passive` works too), and
+  `length` in meters. The status is `connected` and the label is the asset
+  tag (or the name) when the cable is created.
 - **Cable profile:** `1C1P` for 1 + 1 ends, `1CNP:NC1P breakout` for 1 + N
   ends (or the profile key `x-cable-profile`). Side B ends are terminated in
   the order of the slots, so NetBox traces each channel of a breakout cable

@@ -15,10 +15,10 @@ profile if its JSON schema has the properties `side`, `a_ends` and `b_ends`.
 
 Cable: when ends on both sides are installed, the plugin connects them with one
 NetBox cable. Its type and length are the module type attributes `cable_type`
-(a NetBox cable type, e.g. "dac-passive") and `length` (in meters). The NetBox
-cable profile follows from the topology (1 + 1 ends: single 1C1P, 1 + N ends:
-1CNP:NC1P breakout) or is set with the optional top-level key
-`x-cable-profile`.
+(a NetBox cable type, e.g. "Direct Attach Copper (Passive)" or "dac-passive",
+see CABLE_TYPE_LABELS) and `length` (in meters). The NetBox cable profile
+follows from the topology (1 + 1 ends: single 1C1P, 1 + N ends: 1CNP:NC1P
+breakout) or is set with the optional top-level key `x-cable-profile`.
 """
 
 from collections import namedtuple
@@ -30,6 +30,7 @@ from dcim.choices import CableProfileChoices, CableTypeChoices
 __all__ = (
     'ASSEMBLY_PROPERTIES',
     'CABLE_PROFILE_KEY',
+    'CABLE_TYPE_LABELS',
     'END_LABEL_MAX_LENGTH',
     'END_NAMES_KEY',
     'SIDE_A',
@@ -39,6 +40,7 @@ __all__ = (
     'AssemblySpec',
     'assembly_module_type_q',
     'get_assembly_spec',
+    'get_cable_type',
     'get_module_type_side',
     'is_assembly_module_type',
     'is_assembly_schema',
@@ -56,6 +58,49 @@ SIDE_BOTH = 'both'
 SIDES = (SIDE_A, SIDE_B, SIDE_BOTH)
 
 AssemblySlot = namedtuple('AssemblySlot', ('label', 'side'))
+
+# Labels of the NetBox cable types for the `cable_type` attribute. NetBox shows
+# the `enum` values of a profile property as they are in the module type form,
+# so profiles list these labels, and the plugin maps them to the NetBox cable
+# type. The NetBox values (e.g. "dac-passive") are accepted too. The labels are
+# copied from dcim.choices.CableTypeChoices (NetBox 4.7.4) and kept here, so
+# that module types keep working if NetBox renames a label.
+CABLE_TYPE_LABELS = {
+    'cat3': 'CAT3',
+    'cat5': 'CAT5',
+    'cat5e': 'CAT5e',
+    'cat6': 'CAT6',
+    'cat6a': 'CAT6a',
+    'cat7': 'CAT7',
+    'cat7a': 'CAT7a',
+    'cat8': 'CAT8',
+    'mrj21-trunk': 'MRJ21 Trunk',
+    'dac-active': 'Direct Attach Copper (Active)',
+    'dac-passive': 'Direct Attach Copper (Passive)',
+    'coaxial': 'Coaxial',
+    'rg-6': 'RG-6',
+    'rg-8': 'RG-8',
+    'rg-11': 'RG-11',
+    'rg-59': 'RG-59',
+    'rg-62': 'RG-62',
+    'rg-213': 'RG-213',
+    'lmr-100': 'LMR-100',
+    'lmr-200': 'LMR-200',
+    'lmr-400': 'LMR-400',
+    'mmf': 'Multimode Fiber',
+    'mmf-om1': 'Multimode Fiber (OM1)',
+    'mmf-om2': 'Multimode Fiber (OM2)',
+    'mmf-om3': 'Multimode Fiber (OM3)',
+    'mmf-om4': 'Multimode Fiber (OM4)',
+    'mmf-om5': 'Multimode Fiber (OM5)',
+    'smf': 'Single-mode Fiber',
+    'smf-os1': 'Single-mode Fiber (OS1)',
+    'smf-os2': 'Single-mode Fiber (OS2)',
+    'aoc': 'Active Optical Cabling (AOC)',
+    'power': 'Power',
+    'usb': 'USB',
+}
+_CABLE_TYPES_BY_LABEL = {label: value for value, label in CABLE_TYPE_LABELS.items()}
 
 
 def assembly_module_type_q(prefix='module_type'):
@@ -86,6 +131,18 @@ def get_module_type_side(module_type):
     """Return side of a module type ("A", "B" or "both"), or None if not set."""
     side = (module_type.attribute_data or {}).get('side')
     return side if side in SIDES else None
+
+
+def get_cable_type(name):
+    """
+    NetBox cable type for the value of a `cable_type` attribute: the label of
+    the cable type (see CABLE_TYPE_LABELS) or its NetBox value. None if it is
+    not a NetBox cable type.
+    """
+    if not isinstance(name, str):
+        return None
+    value = _CABLE_TYPES_BY_LABEL.get(name, name)
+    return value if value in CableTypeChoices.values() else None
 
 
 def _fixed_integer(prop):
@@ -142,10 +199,12 @@ def _validate_cable(schema, counts):
                     f'side B ends.'
                 )
     cable_types = schema['properties'].get('cable_type', {}).get('enum') or []
-    if unknown := [t for t in cable_types if t not in CableTypeChoices.values()]:
+    if unknown := [t for t in cable_types if get_cable_type(t) is None]:
         errors.append(
             f'Property "cable_type": unknown NetBox cable types: '
-            f'{", ".join(map(str, unknown))}.'
+            f'{", ".join(map(str, unknown))}. Use the label of a NetBox cable '
+            f'type (for example "Direct Attach Copper (Passive)") or its value '
+            f'("dac-passive").'
         )
     return errors
 

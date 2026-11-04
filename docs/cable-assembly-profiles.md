@@ -52,7 +52,7 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [both], default: both}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [1], default: 1}
-      cable_type: {type: string, title: Cable type, enum: [dac-passive, dac-active]}
+      cable_type: {type: string, title: Cable type, enum: ["Direct Attach Copper (Passive)", "Direct Attach Copper (Active)"]}
       length: {type: number, title: Length (m), minimum: 0}
     required: [side, cable_type, length]
 - name: DAC SFP28 - SFP28
@@ -66,7 +66,7 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [both], default: both}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [1], default: 1}
-      cable_type: {type: string, title: Cable type, enum: [dac-passive, dac-active]}
+      cable_type: {type: string, title: Cable type, enum: ["Direct Attach Copper (Passive)", "Direct Attach Copper (Active)"]}
       length: {type: number, title: Length (m), minimum: 0}
     required: [side, cable_type, length]
 - name: DAC QSFP28 - QSFP28
@@ -80,7 +80,7 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [both], default: both}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [1], default: 1}
-      cable_type: {type: string, title: Cable type, enum: [dac-passive, dac-active]}
+      cable_type: {type: string, title: Cable type, enum: ["Direct Attach Copper (Passive)", "Direct Attach Copper (Active)"]}
       length: {type: number, title: Length (m), minimum: 0}
     required: [side, cable_type, length]
 - name: AOC QSFP28 - QSFP28
@@ -94,7 +94,7 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [both], default: both}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [1], default: 1}
-      cable_type: {type: string, title: Cable type, enum: [aoc], default: aoc}
+      cable_type: {type: string, title: Cable type, enum: ["Active Optical Cabling (AOC)"], default: "Active Optical Cabling (AOC)"}
       length: {type: number, title: Length (m), minimum: 0}
     required: [side, cable_type, length]
 - name: Breakout QSFP+ - 4xSFP+
@@ -108,7 +108,7 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [A, B]}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [4], default: 4}
-      cable_type: {type: string, title: Cable type, enum: [dac-passive, dac-active, aoc]}
+      cable_type: {type: string, title: Cable type, enum: ["Direct Attach Copper (Passive)", "Direct Attach Copper (Active)", "Active Optical Cabling (AOC)"]}
       length: {type: number, title: Length (m), minimum: 0}
     required: [side, cable_type, length]
 - name: Breakout QSFP28 - 4xSFP28
@@ -122,7 +122,7 @@ all six profiles. You can delete the ones you do not need from the block first.
       side: {type: string, title: Assembly side, enum: [A, B]}
       a_ends: {type: integer, title: A-side ends, enum: [1], default: 1}
       b_ends: {type: integer, title: B-side ends, enum: [4], default: 4}
-      cable_type: {type: string, title: Cable type, enum: [dac-passive, dac-active, aoc]}
+      cable_type: {type: string, title: Cable type, enum: ["Direct Attach Copper (Passive)", "Direct Attach Copper (Active)", "Active Optical Cabling (AOC)"]}
       length: {type: number, title: Length (m), minimum: 0}
     required: [side, cable_type, length]
 ```
@@ -179,7 +179,7 @@ now.
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["both"], "default": "both"},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [1], "default": 1},
-    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["Direct Attach Copper (Passive)", "Direct Attach Copper (Active)"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
   "required": ["side", "cable_type", "length"]
@@ -198,7 +198,7 @@ attribute_data:
   side: both
   a_ends: 1
   b_ends: 1
-  cable_type: dac-passive
+  cable_type: Direct Attach Copper (Passive)
   length: 1
 interfaces:
   - name: "{module}"
@@ -213,7 +213,7 @@ attribute_data:
   side: both
   a_ends: 1
   b_ends: 1
-  cable_type: dac-passive
+  cable_type: Direct Attach Copper (Passive)
   length: 3
 interfaces:
   - name: "{module}"
@@ -226,8 +226,8 @@ interfaces:
 2. Install `SFP+ A` in `leaf1` / module bay `Ethernet1/1`, and `SFP+ B` in
    `leaf2` / module bay `Ethernet1/1`.
 3. When `SFP+ B` is installed, the plugin creates the cable from
-   `leaf1 Ethernet1/1` to `leaf2 Ethernet1/1`: type `DAC (Passive)`, profile
-   `1C1P`, length 1 m.
+   `leaf1 Ethernet1/1` to `leaf2 Ethernet1/1`: type
+   `Direct Attach Copper (Passive)`, profile `1C1P`, length 1 m.
 
 ## 2. DAC SFP28 - SFP28 (25G)
 
@@ -243,7 +243,7 @@ interfaces:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["both"], "default": "both"},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [1], "default": 1},
-    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["Direct Attach Copper (Passive)", "Direct Attach Copper (Active)"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
   "required": ["side", "cable_type", "length"]
@@ -262,7 +262,7 @@ attribute_data:
   side: both
   a_ends: 1
   b_ends: 1
-  cable_type: dac-passive
+  cable_type: Direct Attach Copper (Passive)
   length: 2
 interfaces:
   - name: "{module}"
@@ -275,7 +275,8 @@ interfaces:
 2. Install `SFP28 A` in `tor1` / module bay `Ethernet1/10`, and `SFP28 B` in
    `server10` / module bay `ens1f0`.
 3. The plugin creates the cable from `tor1 Ethernet1/10` to
-   `server10 ens1f0`: type `DAC (Passive)`, profile `1C1P`, length 2 m.
+   `server10 ens1f0`: type `Direct Attach Copper (Passive)`, profile `1C1P`,
+   length 2 m.
 
 ## 3. DAC QSFP28 - QSFP28 (100G)
 
@@ -291,7 +292,7 @@ interfaces:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["both"], "default": "both"},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [1], "default": 1},
-    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["Direct Attach Copper (Passive)", "Direct Attach Copper (Active)"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
   "required": ["side", "cable_type", "length"]
@@ -310,7 +311,7 @@ attribute_data:
   side: both
   a_ends: 1
   b_ends: 1
-  cable_type: dac-passive
+  cable_type: Direct Attach Copper (Passive)
   length: 1
 interfaces:
   - name: "{module}"
@@ -323,7 +324,8 @@ interfaces:
 2. Install `QSFP28 A` in `leaf1` / module bay `Ethernet1/53`, and `QSFP28 B`
    in `leaf2` / module bay `Ethernet1/53`.
 3. The plugin creates the cable from `leaf1 Ethernet1/53` to
-   `leaf2 Ethernet1/53`: type `DAC (Passive)`, profile `1C1P`, length 1 m.
+   `leaf2 Ethernet1/53`: type `Direct Attach Copper (Passive)`, profile
+   `1C1P`, length 1 m.
 
 ## 4. AOC QSFP28 - QSFP28 (100G)
 
@@ -339,7 +341,7 @@ interfaces:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["both"], "default": "both"},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [1], "default": 1},
-    "cable_type": {"type": "string", "title": "Cable type", "enum": ["aoc"], "default": "aoc"},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["Active Optical Cabling (AOC)"], "default": "Active Optical Cabling (AOC)"},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
   "required": ["side", "cable_type", "length"]
@@ -358,7 +360,7 @@ attribute_data:
   side: both
   a_ends: 1
   b_ends: 1
-  cable_type: aoc
+  cable_type: Active Optical Cabling (AOC)
   length: 10
 interfaces:
   - name: "{module}"
@@ -371,7 +373,8 @@ interfaces:
 2. Install `QSFP28 A` in `spine1` / module bay `Ethernet1/1`, and `QSFP28 B`
    in `leaf1` / module bay `Ethernet1/49`.
 3. The plugin creates the cable from `spine1 Ethernet1/1` to
-   `leaf1 Ethernet1/49`: type `AOC`, profile `1C1P`, length 10 m.
+   `leaf1 Ethernet1/49`: type `Active Optical Cabling (AOC)`, profile `1C1P`,
+   length 10 m.
 
 ## 5. Breakout QSFP+ - 4xSFP+ (40G to 4x10G)
 
@@ -391,7 +394,7 @@ interfaces:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["A", "B"]},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [4], "default": 4},
-    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active", "aoc"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["Direct Attach Copper (Passive)", "Direct Attach Copper (Active)", "Active Optical Cabling (AOC)"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
   "required": ["side", "cable_type", "length"]
@@ -412,7 +415,7 @@ attribute_data:
   side: A
   a_ends: 1
   b_ends: 4
-  cable_type: dac-passive
+  cable_type: Direct Attach Copper (Passive)
   length: 3
 interfaces:
   - name: "{module}"
@@ -444,7 +447,7 @@ attribute_data:
   side: B
   a_ends: 1
   b_ends: 4
-  cable_type: dac-passive
+  cable_type: Direct Attach Copper (Passive)
   length: 3
 interfaces:
   - name: "{module}"
@@ -460,9 +463,10 @@ interfaces:
 3. The plugin creates one cable when the QSFP+ end and the first SFP+ end are
    installed, and adds each further SFP+ end: side A `sw1 Ethernet1/49`,
    side B `srv1 eth0` to `srv4 eth0` in the order B1 to B4, type
-   `DAC (Passive)`, profile `1C4P:4C1P breakout`, length 3 m. NetBox then
-   traces `sw1 Ethernet1/49:1` to `srv1 eth0`, `Ethernet1/49:2` to
-   `srv2 eth0` and so on. The ends can be installed in any order.
+   `Direct Attach Copper (Passive)`, profile `1C4P:4C1P breakout`, length
+   3 m. NetBox then traces `sw1 Ethernet1/49:1` to `srv1 eth0`,
+   `Ethernet1/49:2` to `srv2 eth0` and so on. The ends can be installed in
+   any order.
 4. If only some SFP+ ends are used, install them in the order B1, B2, …:
    NetBox assigns the cable connectors by the order of the terminations, so
    with a gap (for example B1 and B3 without B2) the plugin creates the cable
@@ -487,7 +491,7 @@ interfaces:
     "side":   {"type": "string",  "title": "Assembly side", "enum": ["A", "B"]},
     "a_ends": {"type": "integer", "title": "A-side ends",   "enum": [1], "default": 1},
     "b_ends": {"type": "integer", "title": "B-side ends",   "enum": [4], "default": 4},
-    "cable_type": {"type": "string", "title": "Cable type", "enum": ["dac-passive", "dac-active", "aoc"]},
+    "cable_type": {"type": "string", "title": "Cable type", "enum": ["Direct Attach Copper (Passive)", "Direct Attach Copper (Active)", "Active Optical Cabling (AOC)"]},
     "length": {"type": "number",  "title": "Length (m)", "minimum": 0}
   },
   "required": ["side", "cable_type", "length"]
@@ -506,7 +510,7 @@ attribute_data:
   side: A
   a_ends: 1
   b_ends: 4
-  cable_type: dac-passive
+  cable_type: Direct Attach Copper (Passive)
   length: 2
 interfaces:
   - name: "{module}"
@@ -538,7 +542,7 @@ attribute_data:
   side: B
   a_ends: 1
   b_ends: 4
-  cable_type: dac-passive
+  cable_type: Direct Attach Copper (Passive)
   length: 2
 interfaces:
   - name: "{module}"
@@ -552,8 +556,9 @@ interfaces:
    `SFP28 B1` to `SFP28 B4` in the servers `srv11` to `srv14` / module bay
    `ens1f0`.
 3. The plugin creates one cable: side A `leaf1 Ethernet1/50`, side B the four
-   `ens1f0` interfaces in the order B1 to B4, type `DAC (Passive)`, profile
-   `1C4P:4C1P breakout`, length 2 m.
+   `ens1f0` interfaces in the order B1 to B4, type
+   `Direct Attach Copper (Passive)`, profile `1C4P:4C1P breakout`, length
+   2 m.
 
 ## Writing your own profile
 
@@ -582,9 +587,17 @@ A profile is a cable assembly profile if its schema has the properties
   NetBox fails with an error for any other keyword (for example `const` or
   `examples`).
 - `cable_type` and `length` are set on each module type and are used for the
-  cable that the plugin creates: `cable_type` is a NetBox cable type (for
-  example `dac-passive`, `dac-active`, `aoc`, `cat6`, `smf`), `length` is in
-  meters. Without them the cable has no type or no length.
+  cable that the plugin creates. `length` is in meters. `cable_type` is a
+  NetBox cable type: list the **labels** in `enum`, as NetBox shows the
+  cable types, for example `Direct Attach Copper (Passive)`,
+  `Direct Attach Copper (Active)`, `Active Optical Cabling (AOC)`, `CAT6`,
+  `Single-mode Fiber`. The module type form shows the `enum` values as they
+  are, and the plugin maps each label to the NetBox cable type. The labels
+  are those of NetBox 4.7.4 and are kept by the plugin (`CABLE_TYPE_LABELS`
+  in `netbox_assets/assembly.py`), so they keep working if a later NetBox
+  version renames one. The NetBox values (`dac-passive`, `dac-active`,
+  `aoc`, …) are accepted too. Without `cable_type` or `length` the cable has
+  no type or no length.
 - The NetBox cable profile follows from the topology: `single-1c1p` for 1 + 1
   ends, `breakout-1c2p-2c1p`, `breakout-1c4p-4c1p`, `breakout-1c6p-6c1p` or
   `breakout-1c8p-8c1p` for 1 + 2, 4, 6 or 8 ends, no profile otherwise. Set the

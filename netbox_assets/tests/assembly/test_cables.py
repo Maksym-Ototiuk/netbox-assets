@@ -6,11 +6,17 @@ from django.db import transaction
 from django.test import SimpleTestCase
 from django.urls import reverse
 
+from dcim.choices import CableTypeChoices
 from dcim.models import Cable, Interface, ModuleType
 from utilities.exceptions import AbortRequest
 from utilities.testing import TestCase
 
-from netbox_assets.assembly import AssemblySpec, validate_assembly_schema
+from netbox_assets.assembly import (
+    CABLE_TYPE_LABELS,
+    AssemblySpec,
+    get_cable_type,
+    validate_assembly_schema,
+)
 from netbox_assets.models import Asset, AssetModuleEnd
 from netbox_assets.tests.assembly.utils import (
     BREAKOUT_SCHEMA,
@@ -44,6 +50,28 @@ class CableSchemaTestCase(SimpleTestCase):
         schema = deepcopy(DAC_SCHEMA)
         schema['properties']['cable_type']['enum'] = ['dac-passive', 'copper-dac']
         self.assertIn('copper-dac', validate_assembly_schema(schema)[0])
+        # labels, values and both mixed
+        for enum in (
+            ['Direct Attach Copper (Passive)', 'Active Optical Cabling (AOC)'],
+            ['dac-passive', 'aoc'],
+            ['Direct Attach Copper (Active)', 'dac-passive'],
+        ):
+            schema['properties']['cable_type']['enum'] = enum
+            self.assertEqual(validate_assembly_schema(schema), [])
+
+    def test_get_cable_type(self):
+        self.assertEqual(get_cable_type('Direct Attach Copper (Passive)'), 'dac-passive')
+        self.assertEqual(get_cable_type('Direct Attach Copper (Active)'), 'dac-active')
+        self.assertEqual(get_cable_type('Active Optical Cabling (AOC)'), 'aoc')
+        self.assertEqual(get_cable_type('dac-passive'), 'dac-passive')
+        for name in ('DAC (Passive)', 'direct attach copper (passive)', '', None, 1):
+            self.assertIsNone(get_cable_type(name))
+
+    def test_cable_type_labels(self):
+        # every cable type of the plugin must exist in NetBox (see CLAUDE.md)
+        self.assertEqual(
+            set(CABLE_TYPE_LABELS) - set(CableTypeChoices.values()), set()
+        )
 
 
 class AssemblyCableTestCase(AssemblyFixtures, TestCase):
@@ -103,6 +131,7 @@ class AssemblyCableTestCase(AssemblyFixtures, TestCase):
 
         end_b = self.install(self.dac, self.device2, 1, 'SFP+ B')
         cable = self.cable_of(self.dac)
+        # module type attribute "Direct Attach Copper (Passive)"
         self.assertEqual(cable.type, 'dac-passive')
         self.assertEqual(cable.profile, 'single-1c1p')
         self.assertEqual(cable.length, Decimal('1.00'))
@@ -294,6 +323,7 @@ class AssemblyCableTestCase(AssemblyFixtures, TestCase):
     def test_module_type_changed(self):
         self.install_breakout('B1')
         module_type = ModuleType.objects.get(pk=self.breakout_a_type.pk)
+        # the NetBox value of a cable type works as well as its label
         module_type.attribute_data = {'side': 'A', 'cable_type': 'aoc', 'length': 3}
         module_type.save()
         cable = self.cable_of(self.breakout)

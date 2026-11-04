@@ -7,8 +7,8 @@ the interfaces of the end modules with one NetBox cable (Asset.assembly_cable):
 - side A terminations are the interfaces of the side A ends, side B
   terminations the interfaces of the side B ends, both in the order of the
   slots (NetBox derives the cable connector from this order);
-- type and length come from the module type attributes `cable_type` and
-  `length` (meters);
+- type and length come from the module type attributes `cable_type` (the
+  label or the value of a NetBox cable type) and `length` (meters);
 - the cable profile is the profile of the assembly (e.g. 1C4P:4C1P breakout),
   but only if the installed ends of each side are the first slots of the side
   without a gap. With a gap (e.g. B1 and B3 installed) NetBox would map B3 to
@@ -26,11 +26,11 @@ from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 
-from dcim.choices import CableLengthUnitChoices, CableTypeChoices, LinkStatusChoices
+from dcim.choices import CableLengthUnitChoices, LinkStatusChoices
 from dcim.models import Cable
 from netbox.context import current_request
 
-from .assembly import SIDE_A, SIDE_B
+from .assembly import SIDE_A, SIDE_B, get_cable_type
 from .utils import abort_request
 
 __all__ = (
@@ -86,9 +86,7 @@ def count_end_interfaces(module):
 def get_cable_values(asset):
     """Type and length of the cable, from the attributes of the module type."""
     data = asset.module_type.attribute_data or {}
-    cable_type = data.get('cable_type')
-    if cable_type not in CableTypeChoices.values():
-        cable_type = None
+    cable_type = get_cable_type(data.get('cable_type'))
     length = data.get('length')
     try:
         length = Decimal(str(length)).quantize(Decimal('0.01'))
