@@ -3,6 +3,14 @@
 All notable changes to netbox-assets. The versions follow
 [semantic versioning](https://semver.org/).
 
+## 1.2.1 (unreleased)
+
+### Removed
+
+- The *Assembly Ends* menu item. The ends of a cable assembly are managed in
+  the *Assembly Ends* panel of the asset page; the list of all ends and its
+  import are still available at `/plugins/assets/assembly-ends/`.
+
 ## 1.2.0 (unreleased)
 
 ### Added

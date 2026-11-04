@@ -183,9 +183,11 @@ and installation examples, and the rules for writing your own profiles.
 
 The panel shows for each end the device, module bay, module, its interfaces
 and the connected cable, and which end is the primary end. A module page
-shows the cable assembly and the end for modules that are ends. All ends are
-also listed in *Assets → Assembly Ends*, where they can be imported, exported
-and deleted in bulk.
+shows the cable assembly and the end for modules that are ends. The list of
+all ends is not in the menu; open `/plugins/assets/assembly-ends/` (or the
+*Assembly Ends* breadcrumb on the page of an end) to filter, export and
+delete ends in bulk, and `/plugins/assets/assembly-ends/import/` to import
+them.
 
 ### Rules
 
@@ -389,8 +391,8 @@ GraphQL queries: `asset`, `asset_list`, `asset_role`, `asset_role_list`,
 `assembly_end`, `assembly_end_list`. Assets have the fields `ends` and
 `assembly_cable`.
 
-To import ends (*Assets → Assembly Ends → Import*), use the columns `asset`
-(asset ID), `device` (device name), `module_bay` (module bay name), and
+To import ends (`/plugins/assets/assembly-ends/import/`), use the columns
+`asset` (asset ID), `device` (device name), `module_bay` (module bay name), and
 optionally `label` and `is_primary`. A module must be installed in the module
 bay.
 

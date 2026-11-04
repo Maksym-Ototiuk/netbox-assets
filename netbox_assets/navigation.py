@@ -15,21 +15,6 @@ asset_buttons = [
     ),
 ]
 
-assetmoduleend_buttons = [
-    PluginMenuButton(
-        link='plugins:netbox_assets:assetmoduleend_add',
-        title='Add',
-        icon_class='mdi mdi-plus-thick',
-        permissions=['netbox_assets.add_assetmoduleend'],
-    ),
-    PluginMenuButton(
-        link='plugins:netbox_assets:assetmoduleend_bulk_import',
-        title='Import',
-        icon_class='mdi mdi-upload',
-        permissions=['netbox_assets.add_assetmoduleend'],
-    ),
-]
-
 assetrole_buttons = [
     PluginMenuButton(
         link='plugins:netbox_assets:assetrole_add',
@@ -51,12 +36,6 @@ assets_items = (
         link_text='Assets',
         permissions=['netbox_assets.view_asset'],
         buttons=asset_buttons,
-    ),
-    PluginMenuItem(
-        link='plugins:netbox_assets:assetmoduleend_list',
-        link_text='Assembly Ends',
-        permissions=['netbox_assets.view_assetmoduleend'],
-        buttons=assetmoduleend_buttons,
     ),
     PluginMenuItem(
         link='plugins:netbox_assets:assetrole_list',

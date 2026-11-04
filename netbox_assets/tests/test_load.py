@@ -6,6 +6,7 @@ from django.test import SimpleTestCase
 from django.urls import reverse
 
 from netbox_assets import __version__
+from netbox_assets.navigation import menu
 from netbox_assets.tests.custom import APITestCase
 
 
@@ -16,6 +17,19 @@ class NetBoxAssetsVersionTestCase(SimpleTestCase):
 
     def test_version(self):
         assert __version__ == '1.2.0'
+
+
+class NavigationTestCase(SimpleTestCase):
+    def test_no_assembly_ends_menu_item(self):
+        # cable assembly ends are managed on the asset page
+        links = [item.link for group in menu.groups for item in group.items]
+        self.assertEqual(
+            links,
+            [
+                'plugins:netbox_assets:asset_list',
+                'plugins:netbox_assets:assetrole_list',
+            ],
+        )
 
 
 class CoexistenceGuardTestCase(SimpleTestCase):
