@@ -3,7 +3,7 @@
 All notable changes to netbox-assets. The versions follow
 [semantic versioning](https://semver.org/).
 
-## 1.2.1 (unreleased)
+## 1.2.1 (2026-11-04)
 
 ### Added
 
@@ -49,7 +49,7 @@ All notable changes to netbox-assets. The versions follow
   interface, or when the module bay had no position for `{module}`. The
   Install form now shows an error, as the NetBox module form does.
 
-## 1.2.0 (unreleased)
+## 1.2.0 (not released, included in 1.2.1)
 
 ### Added
 
