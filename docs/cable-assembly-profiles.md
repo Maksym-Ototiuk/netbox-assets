@@ -18,12 +18,14 @@ topology and one module type (or one pair of module types, side A and side B)
 per product, for example per length.
 
 The profiles 1 to 4 are **symmetric**: both ends are the same, so each product
-needs one module type with `side: both`. The breakout profiles 5 and 6 are
-**asymmetric**: each product needs a side A module type (the QSFP end) and a
-side B module type (the SFP ends).
+needs **one** module type with `side: both`. The breakout profiles 5 and 6 are
+**asymmetric**: each product needs **two** module types with the same
+manufacturer, side A (the QSFP end) and side B (the SFP ends). See
+[Module types](#module-types).
 
 ## Contents
 
+- [Module types](#module-types)
 - [Import all profiles](#import-all-profiles)
 - [How the examples are installed](#how-the-examples-are-installed)
 - [1. DAC SFP+ - SFP+ (10G)](#1-dac-sfp---sfp-10g)
@@ -33,6 +35,50 @@ side B module type (the SFP ends).
 - [5. Breakout QSFP+ - 4xSFP+ (40G to 4x10G)](#5-breakout-qsfp---4xsfp-40g-to-4x10g)
 - [6. Breakout QSFP28 - 4xSFP28 (100G to 4x25G)](#6-breakout-qsfp28---4xsfp28-100g-to-4x25g)
 - [Writing your own profile](#writing-your-own-profile)
+- [Troubleshooting](#troubleshooting)
+
+## Module types
+
+- **Symmetric** profiles (1 to 4, `side` with `"enum": ["both"]`): **one**
+  module type per product, with `side: both`. The asset and both ends use
+  it.
+- **Breakout** profiles (5 and 6, `side` with `"enum": ["A", "B"]`): **two**
+  module types per product, with the **same profile and the same
+  manufacturer**:
+  - side `A`, the QSFP end: the asset uses this module type, and so does the
+    side A end;
+  - side `B`, the SFP ends: used only for the side B ends, when they are
+    installed. The Install form preselects it. Without it the side B ends
+    cannot be installed: the *Assembly Ends* panel of the asset and the
+    Install form show a warning with a link to the NetBox module type form,
+    prefilled with the profile, the manufacturer and the attributes.
+
+  The examples name the two module types `…-A` and `…-B` and give them the
+  same part number.
+
+The attributes of the profile in the NetBox module type form:
+
+- **Assembly side** (`side`): which end this module type is, `A`, `B` or
+  `both`.
+- **A-side ends**, **B-side ends** (`a_ends`, `b_ends`): the topology, the
+  number of ends on side A and side B. They are fixed in the profile (the
+  form offers one value) and are the same for all module types of the
+  profile: `1` and `4` for a breakout cable, for the side A and the side B
+  module type alike. They do not say which end the module type is; `side`
+  does.
+- **Cable type** (`cable_type`) and **Length (m)** (`length`): type and
+  length of the NetBox cable that the plugin creates.
+
+Interface templates:
+
+- Each module type must have **exactly one interface template that is not a
+  channel subinterface**; the plugin connects the cable to it. The side A
+  module type of a breakout cable has one channelized interface
+  (`channels: 4`) and its channel subinterfaces (`parent`, `channel_id`).
+- Interface templates of a module type apply only to modules created after
+  they were added. An existing module keeps its interfaces.
+- `{module}` in an interface name is the **position** of the module bay, see
+  [How the examples are installed](#how-the-examples-are-installed).
 
 ## Import all profiles
 
@@ -611,3 +657,63 @@ The plugin rejects a cable assembly profile that breaks these rules when it is
 saved. Once assets use a profile, its properties `side`, `a_ends` and
 `b_ends` cannot be removed, and installed ends cannot disappear (you can add
 ends, but not remove or rename installed ones).
+
+## Troubleshooting
+
+**"End SFP+ B1 of … must be a module of a side B module type with profile …
+and manufacturer …, not …"**
+
+The module of a side B end must be of a side B module type with the profile
+and the manufacturer of the asset's module type. The error names the module
+type of the module (with its profile, side and manufacturer) and lists the
+side B module types that would fit. Causes:
+
+- **There is no side B module type** (the error says "There is no such module
+  type"). Create it with the same profile and manufacturer and
+  `side: B`; the *Create Module Type* button in the *Assembly Ends* panel
+  opens the prefilled NetBox form.
+- **The side B module type has another manufacturer** than the asset's
+  module type. Use the same manufacturer for both module types.
+- **The module bay already has a module** (the error adds "Module bay …
+  already has a module of type …"). If the bay is not empty, its module
+  becomes the end, so it must be of the right module type. Choose an empty
+  module bay, or delete the module that is in the bay (for example a
+  transceiver module) first.
+- The side A module type was selected for a side B end in the Install form.
+
+For side A ends and both ends of a symmetric assembly, the error is "End …
+must be a module of type …, not …": the module must be of the asset's
+module type.
+
+**"Module type … must have exactly one interface (not counting channel
+subinterfaces) to connect the cable of the assembly."**
+
+- The module type has no interface template, or more than one interface
+  template that is not a channel subinterface. Keep one interface (for the
+  side A end of a breakout cable: one channelized interface, the channels
+  as channel subinterfaces with `parent` and `channel_id`).
+- For a module that already exists, the plugin counts the interfaces of the
+  module: interface templates added to the module type later do not change
+  existing modules. Add the interface to the module, or delete the module
+  and install the end in the empty module bay again.
+
+**"Cannot create module: device … already has interface …"**
+
+The Install form creates the module of an end in an empty module bay, and
+the module creates its interface. NetBox replaces `{module}` in the
+interface name with the **position** of the module bay, so the module in a
+bay with position `Ethernet1/1` creates the interface `Ethernet1/1`. The
+device already has an interface with this name, for example from its device
+type. Delete the interface of the device if the module should create it, or
+fix the positions of the module bays or the names of the interface
+templates.
+
+"Cannot create module: module bay … has no position": the interface names
+use `{module}`, but the module bay has no position. Set the position of the
+module bay.
+
+**"Interface … of module … already has cable …. Delete the cable first."**
+
+The interface of the end module is connected to another cable (not the
+cable of this assembly). Delete that cable; the plugin creates the cable of
+the assembly.

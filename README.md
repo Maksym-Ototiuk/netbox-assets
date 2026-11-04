@@ -162,15 +162,60 @@ ready-to-use profiles (DAC SFP+, DAC SFP28, DAC QSFP28, AOC QSFP28, breakout
 QSFP+ to 4x SFP+ and QSFP28 to 4x SFP28) with an import block, module types
 and installation examples, and the rules for writing your own profiles.
 
+### Module types
+
+A profile describes a topology; each product (for example each length) is a
+module type of the profile. How many module types a product needs:
+
+- **Symmetric DAC or AOC** (the same connector on both ends, `side` with
+  `"enum": ["both"]` in the profile): **one** module type with `side: both`.
+  The asset and both ends use it.
+- **Breakout cable** (for example QSFP+ to 4x SFP+, `side` with
+  `"enum": ["A", "B"]`): **two** module types with the **same profile and the
+  same manufacturer**:
+  - side `A`, the QSFP end: the asset uses this module type, and so does the
+    side A end;
+  - side `B`, the SFP ends: used only when the side B ends are installed.
+    The Install form preselects it; without it the side B ends cannot be
+    installed, and the *Assembly Ends* panel shows a warning with a
+    *Create Module Type* button.
+
+The fields of the profile in the NetBox module type form:
+
+| Field (attribute)                       | Meaning |
+| --------------------------------------- | ------- |
+| Assembly side (`side`)                  | Which end this module type is: `A`, `B` or `both`. |
+| A-side ends, B-side ends (`a_ends`, `b_ends`) | The topology: the number of ends on side A and side B. Fixed in the profile (the form offers one value) and the same for all module types of the profile, the side B type too. |
+| Cable type (`cable_type`)               | Type of the NetBox cable that the plugin creates. |
+| Length (m) (`length`)                   | Length of this cable, in meters. |
+
+Interfaces:
+
+- Each module type must have **exactly one interface template that is not a
+  channel subinterface**; the plugin connects the cable to it. The side A
+  type of a breakout cable has one channelized interface (for example
+  `channels: 4`) and its channel subinterfaces.
+- Interface templates of a module type apply only to modules created after
+  they were added. An existing module keeps its interfaces: add the
+  interface to the module, or delete the module and install the end in the
+  empty module bay again.
+- Name the interface templates with `{module}`: NetBox replaces it with the
+  **position** of the module bay (not its name), so the module bays need a
+  position.
+
+[Troubleshooting](docs/cable-assembly-profiles.md#troubleshooting) explains
+the errors for missing or wrong module types and interfaces.
+
 ### Setup and usage
 
 1. Create the profiles: *Devices → Module Type Profiles* (or import them from
    the [examples](docs/cable-assembly-profiles.md#import-all-profiles)).
 2. Create the module types with the profile and the attributes `side`,
    `cable_type` and `length`: one `both` module type for a symmetric
-   assembly, or a side `A` and a side `B` module type for a breakout cable.
-   Add one interface template for the port (for a breakout QSFP end: a
-   channelized interface with its channel subinterfaces).
+   assembly, or a side `A` and a side `B` module type with the same
+   manufacturer for a breakout cable. Add one interface template for the
+   port (for a breakout QSFP end: a channelized interface with its channel
+   subinterfaces). See [Module types](#module-types).
 3. Create the asset with the side `A` (or `both`) module type. It is
    `stored`.
 4. On the asset page, the **Assembly Ends** panel lists all ends of the

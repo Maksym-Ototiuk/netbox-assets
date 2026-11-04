@@ -14,6 +14,10 @@ All notable changes to netbox-assets. The versions follow
 - A warning in the *Assembly Ends* panel and in the Install form when a
   breakout cable has no side B module type, with a link to the module type
   form, prefilled with the profile, the manufacturer and the attributes.
+- Documentation of the module types of cable assemblies (one module type for
+  a symmetric assembly, two with the same manufacturer for a breakout
+  cable), the attributes in the module type form, the interface templates,
+  and a troubleshooting section for the common errors.
 
 ### Changed
 
