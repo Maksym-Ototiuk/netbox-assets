@@ -51,6 +51,12 @@ the plugin must fail the tests. How to run them: *Development* in `README.md`.
 
 The screenshots of the guide (`docs/images/`) are not checked by the tests.
 
+The end-to-end job of `test.yml` runs on a fixed runner image (`ubuntu-26.04`),
+not `ubuntu-latest`: `playwright install --with-deps` supports only the Ubuntu
+versions that the Playwright release knows (Playwright 1.55 failed on Ubuntu
+26.04). Change the image and the Playwright version of `e2e/requirements.txt`
+together.
+
 ## Supporting a new NetBox version
 
 `supported-netbox-versions.json` lists the tested NetBox versions; the test
