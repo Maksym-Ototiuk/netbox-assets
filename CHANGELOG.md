@@ -3,6 +3,21 @@
 All notable changes to netbox-assets. The versions follow
 [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+### Documentation
+
+- The README describes the problems the plugin solves (hardware that is not
+  installed, cable assemblies as one item) and how to keep suppliers,
+  warranty and similar information in custom fields. Links and images in the
+  README are absolute, so they work on PyPI.
+- [Cable assemblies](https://github.com/Maksym-Ototiuk/netbox-assets/blob/main/docs/cable-assembly-profiles.md) is rewritten:
+  step-by-step guides with screenshots (a 10G SFP+ DAC, and a 40G QSFP+ to
+  4x 10G SFP+ breakout cable, from the profile to the traced cable), complete
+  import blocks for the profiles and module types of 10G, 25G and 100G DAC,
+  100G AOC and 40G and 100G breakout cables, and the reference moved from the
+  README.
+
 ## 1.2.1 (2026-11-04)
 
 ### Added
