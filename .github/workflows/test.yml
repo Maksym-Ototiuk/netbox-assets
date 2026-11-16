@@ -1,26 +1,60 @@
-name: Run tests under netbox
+name: Run tests under NetBox
 
 on:
-  - push
-  - pull_request
+  push:
+    # Branches only: a release tag runs the tests through publish.yaml
+    branches:
+      - '**'
+  pull_request:
+  # Called by publish.yaml before a release is published, and by
+  # netbox-latest.yml to test a new NetBox release
+  workflow_call:
+    inputs:
+      netbox-version:
+        description: 'A NetBox tag to test; empty: all supported versions'
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
+  versions:
+    name: NetBox versions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Build the test matrix
+        id: matrix
+        env:
+          NETBOX_VERSION: ${{ inputs.netbox-version }}
+        run: |
+          if [ -n "$NETBOX_VERSION" ]; then
+            matrix=$(python3 -c 'import json, sys; print(json.dumps([sys.argv[1]]))' "$NETBOX_VERSION")
+          else
+            matrix=$(python3 scripts/netbox-versions.py matrix)
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   test-netbox:
+    name: Unit tests (${{ matrix.netbox-version }})
+    needs: versions
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        netbox-version: ["v4.7.4"]
+        netbox-version: ${{ fromJSON(needs.versions.outputs.matrix) }}
     services:
       redis:
         image: redis
         ports:
           - 6379:6379
       postgres:
-        image: postgres
+        image: postgres:17
         env:
           POSTGRES_USER: netbox
           POSTGRES_PASSWORD: netbox
@@ -43,7 +77,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Checkout netbox ${{ matrix.netbox-version }}
+      - name: Checkout NetBox ${{ matrix.netbox-version }}
         uses: actions/checkout@v6
         with:
           repository: "netbox-community/netbox"
@@ -58,7 +92,7 @@ jobs:
       - name: Install dependencies & set up configuration
         working-directory: netbox
         run: |
-          ln -s $(pwd)/../netbox-assets/testing/configuration_testing.py netbox/netbox/configuration.py
+          ln -s "$(pwd)/../netbox-assets/testing/configuration_testing.py" netbox/netbox/configuration.py
           python -m pip install --upgrade pip
           python -m pip install tblib
           pip install -r requirements.txt -U
@@ -67,7 +101,113 @@ jobs:
         working-directory: netbox
         run: python netbox/manage.py makemigrations --check
 
+      - name: Compare the cable type labels with NetBox
+        working-directory: netbox
+        run: |
+          python netbox/manage.py shell --no-startup --no-imports --interface python \
+            < ../netbox-assets/scripts/cable-type-labels.py
+
       - name: Run tests
         working-directory: netbox
         run: |
           python netbox/manage.py test netbox_assets.tests --parallel -v 2
+
+  e2e:
+    name: End-to-end tests (${{ matrix.netbox-version }})
+    needs: versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        netbox-version: ${{ fromJSON(needs.versions.outputs.matrix) }}
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: netbox
+          POSTGRES_PASSWORD: netbox
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          path: netbox-assets
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Checkout NetBox ${{ matrix.netbox-version }}
+        uses: actions/checkout@v6
+        with:
+          repository: "netbox-community/netbox"
+          ref: ${{ matrix.netbox-version }}
+          path: netbox
+
+      - name: Install netbox_assets
+        working-directory: netbox-assets
+        run: |
+          pip install .
+
+      - name: Install dependencies & set up configuration
+        working-directory: netbox
+        run: |
+          ln -s "$(pwd)/../netbox-assets/testing/configuration_testing.py" netbox/netbox/configuration.py
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -U
+
+      - name: Prepare NetBox (migrations, superuser, devices)
+        working-directory: netbox/netbox
+        env:
+          DJANGO_SUPERUSER_PASSWORD: admin
+        run: |
+          python manage.py migrate --no-input
+          python manage.py createsuperuser --no-input --username admin --email admin@example.com
+          python manage.py shell --no-startup --no-imports --interface python \
+            < "$GITHUB_WORKSPACE/netbox-assets/e2e/seed.py"
+
+      - name: Start NetBox
+        working-directory: netbox/netbox
+        run: |
+          nohup python manage.py runserver 127.0.0.1:8000 --insecure --noreload \
+            > "$RUNNER_TEMP/netbox.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -sf -o /dev/null http://127.0.0.1:8000/login/; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/netbox.log"
+          exit 1
+
+      - name: Install Playwright
+        run: |
+          pip install -r netbox-assets/e2e/requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run the end-to-end tests
+        env:
+          NETBOX_URL: http://127.0.0.1:8000
+        run: python -m pytest netbox-assets/e2e -v
+
+      - name: Upload the screenshots and the NetBox log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-${{ matrix.netbox-version }}
+          path: |
+            netbox-assets/e2e/artifacts/
+            ${{ runner.temp }}/netbox.log
+          if-no-files-found: ignore

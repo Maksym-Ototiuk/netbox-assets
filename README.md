@@ -158,17 +158,28 @@ the search box of the asset list, add it to the setting
 
 ## Compatibility
 
-| NetBox           | netbox-assets |
-| ---------------- | ------------- |
-| 4.7.4 and later  | 1.2.x         |
-| 4.7.2 to 4.7.3   | 1.1.x         |
+| NetBox | netbox-assets |
+| ------ | ------------- |
+| 4.7.4  | 1.2.1         |
+
+Every NetBox version in this table has been tested with the plugin: the unit
+tests, and end-to-end tests that follow the
+[cable assemblies guide](https://github.com/Maksym-Ototiuk/netbox-assets/blob/main/docs/cable-assembly-profiles.md)
+in the NetBox web interface. The plugin version is the first release tested
+with that NetBox version; later plugin versions support it too.
+
+New NetBox releases are tested automatically every day. A new patch release
+of a supported NetBox version is added to this table, with a new plugin
+release, as soon as all tests pass with it. A new minor or major NetBox
+version is added after a review.
+
+NetBox 4.7.2 and 4.7.3 are supported by netbox-assets 1.1.x. NetBox 4.7.0 is
+not supported: the database triggers that maintain hierarchical paths could
+not be restored from a database dump in that release
+([netbox#23130](https://github.com/netbox-community/netbox/issues/23130)).
 
 NetBox 4.7 requires Python 3.12 or later, PostgreSQL 15 or later with the
 `ltree` extension, and Redis 6 or later.
-
-NetBox 4.7.0 is not supported: the database triggers that maintain
-hierarchical paths could not be restored from a database dump in that release
-([netbox#23130](https://github.com/netbox-community/netbox/issues/23130)).
 
 ## Installation
 
@@ -300,8 +311,27 @@ serializer on purpose, update the file (this does not work with `--parallel`):
 UPDATE_QUERY_COUNTS=1 python3 manage.py test netbox_assets.tests --keepdb
 ```
 
-GitHub Actions run `ruff` and the test suite against NetBox 4.7.4 on every
-push and pull request.
+The end-to-end tests in `e2e/` follow the
+[cable assemblies guide](https://github.com/Maksym-Ototiuk/netbox-assets/blob/main/docs/cable-assembly-profiles.md)
+in the NetBox web interface with Playwright: they import its YAML blocks,
+create the module types and assets, install the ends, and check the cables
+and their traces. They need a fresh NetBox with the plugin, a superuser
+`admin` / `admin` and the devices of `e2e/seed.py`:
+
+```shell
+cd /opt/netbox/netbox
+python3 manage.py shell --no-startup --no-imports --interface python < /path/to/netbox-assets/e2e/seed.py
+python3 manage.py runserver 127.0.0.1:8000 --insecure
+# in another shell, from the plugin directory
+pip install -r e2e/requirements.txt
+python -m playwright install --with-deps chromium
+NETBOX_URL=http://127.0.0.1:8000 python -m pytest e2e -v
+```
+
+GitHub Actions run `ruff`, the unit tests and the end-to-end tests against
+every NetBox version of `supported-netbox-versions.json` on every push and
+pull request, and test the latest NetBox release every day (see
+[Compatibility](#compatibility)).
 
 ## Version history
 

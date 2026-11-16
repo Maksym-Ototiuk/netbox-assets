@@ -5,6 +5,23 @@ All notable changes to netbox-assets. The versions follow
 
 ## Unreleased
 
+### Added
+
+- New NetBox releases are tested automatically every day. A new patch
+  release of a supported NetBox version is added to the Compatibility table
+  and released with a new plugin version when all tests pass; a new minor or
+  major version gets a pull request, a failure an issue.
+- End-to-end tests that follow the cable assemblies guide in the NetBox web
+  interface: they import its YAML blocks, create the module types and assets,
+  install the ends and check the cables and their traces.
+- The tests compare the cable type labels of the plugin with every tested
+  NetBox version.
+
+### Changed
+
+- A release is published to PyPI only after the lint and all tests pass, and
+  the GitHub Release is published right away with its CHANGELOG section.
+
 ### Documentation
 
 - The README describes the problems the plugin solves (hardware that is not

@@ -7,3 +7,5 @@ dist/
 .idea
 .coverage
 .vscode
+e2e/artifacts/
+.pytest_cache/

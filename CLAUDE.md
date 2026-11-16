@@ -18,21 +18,14 @@ NetBox version the plugin supports (`min_version` / `max_version` in
 - when `CABLE_TYPE_LABELS` is changed.
 
 Run in each NetBox version (from the NetBox root directory, with the plugin
-installed):
+installed); it prints the differences and exits with 1 if there are any:
 
 ```bash
-python netbox/manage.py shell -c "
-from dcim.choices import CableTypeChoices
-from utilities.choices import unpack_grouped_choices
-from netbox_assets.assembly import CABLE_TYPE_LABELS
-netbox = {v: str(l) for v, l in unpack_grouped_choices(CableTypeChoices)}
-diff = [v for v in sorted(netbox.keys() | CABLE_TYPE_LABELS.keys()) if netbox.get(v) != CABLE_TYPE_LABELS.get(v)]
-for v in diff:
-    print(f'{v}: NetBox={netbox.get(v)!r} plugin={CABLE_TYPE_LABELS.get(v)!r}')
-print('differences:', len(diff))
-"
+python netbox/manage.py shell --no-startup --no-imports --interface python < /path/to/netbox-assets/scripts/cable-type-labels.py
 ```
 
+GitHub Actions run this check in `test.yml` for every tested NetBox version,
+so a difference fails the tests (and the daily test of a new NetBox release).
 The test `test_cable_type_labels` (`netbox_assets/tests/assembly/test_cables.py`)
 fails if a value of `CABLE_TYPE_LABELS` does not exist in NetBox. Report every
 difference to the user before changing anything:
@@ -46,3 +39,52 @@ difference to the user before changing anything:
 
 Keep `README.md`, `docs/cable-assembly-profiles.md` and the tests in line with
 `CABLE_TYPE_LABELS` (they name the NetBox version the labels come from).
+
+## End-to-end tests and the cable assemblies guide
+
+The tests in `e2e/` follow `docs/cable-assembly-profiles.md` in the NetBox web
+interface (Playwright): they read the YAML blocks from the guide, and the
+values they use (asset names, serial numbers, devices, cable summaries) are
+those of the guide, checked with `guide.assert_documented()`. Change the guide
+and the end-to-end tests together: a guide that no longer matches NetBox or
+the plugin must fail the tests. How to run them: *Development* in `README.md`.
+
+The screenshots of the guide (`docs/images/`) are not checked by the tests.
+
+## Supporting a new NetBox version
+
+`supported-netbox-versions.json` lists the tested NetBox versions; the test
+matrix is built from it, and the Compatibility table of `README.md` must list
+the same versions (`python scripts/netbox-versions.py check`, run by
+`lint.yml`).
+
+New NetBox releases are checked automatically every day by
+`.github/workflows/netbox-latest.yml`; the tests run only when the latest
+release is not in the list yet. A new patch release of the newest supported
+minor version (e.g. 4.7.5) is added and released to PyPI without a human when
+all tests pass. A new minor or major version (e.g. 4.8.0 or 5.0.0) gets a pull
+request instead, and a failure gets an issue. A manual run of the workflow is
+a dry run by default. For a pull request, an issue or a manual update, do all
+of the following:
+
+1. Run `python scripts/netbox-versions.py add vX.Y.Z`: it adds the version to
+   `supported-netbox-versions.json` and the README table, bumps the PATCH
+   version and adds a CHANGELOG entry (changes under `## Unreleased` become
+   part of that release).
+2. Run the tests against that version: the unit tests, the cable type labels
+   check (see above) and the end-to-end tests.
+3. Read the NetBox release notes for changes to module types and module type
+   profiles, modules and module bays, interfaces and channels, cables, cable
+   profiles and cable paths (tracing), the import forms and `netbox.ui`.
+4. Compare the screenshots of `docs/cable-assembly-profiles.md` with the
+   NetBox web interface; take them again if it changed.
+5. Update `min_version` / `max_version` in `netbox_assets/__init__.py` if
+   needed; if code changes were necessary, describe them in `CHANGELOG.md` and
+   bump MINOR or PATCH as appropriate instead of the PATCH bump of step 1.
+
+Report every failing check to the user before changing code.
+
+Automatic releases push to `main` with `GITHUB_TOKEN` and start
+`publish.yaml` with `gh workflow run`, because a tag pushed with
+`GITHUB_TOKEN` does not trigger workflows. `publish.yaml` publishes only after
+the version check, the lint and all tests pass.
