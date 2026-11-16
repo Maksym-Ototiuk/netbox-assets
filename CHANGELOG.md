@@ -3,7 +3,7 @@
 All notable changes to netbox-assets. The versions follow
 [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.2.2 (2026-11-16)
 
 ### Added
 
@@ -19,6 +19,7 @@ All notable changes to netbox-assets. The versions follow
 
 ### Changed
 
+- Tested with NetBox 4.7.5.
 - A release is published to PyPI only after the lint and all tests pass, and
   the GitHub Release is published right away with its CHANGELOG section.
 

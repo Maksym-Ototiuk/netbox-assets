@@ -16,7 +16,7 @@ class NetBoxAssetsVersionTestCase(SimpleTestCase):
     """
 
     def test_version(self):
-        assert __version__ == '1.2.1'
+        assert __version__ == '1.2.2'
 
 
 class NavigationTestCase(SimpleTestCase):
