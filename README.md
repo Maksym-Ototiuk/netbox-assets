@@ -162,6 +162,7 @@ the search box of the asset list, add it to the setting
 | ------ | ------------- |
 | 4.7.4  | 1.2.1         |
 | 4.7.5  | 1.2.2         |
+| 4.7.6  | 1.2.3         |
 
 Every NetBox version in this table has been tested with the plugin: the unit
 tests, and end-to-end tests that follow the

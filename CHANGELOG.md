@@ -3,6 +3,12 @@
 All notable changes to netbox-assets. The versions follow
 [semantic versioning](https://semver.org/).
 
+## 1.2.3 (2026-11-24)
+
+### Changed
+
+- Tested with NetBox 4.7.6; no code changes.
+
 ## 1.2.2 (2026-11-16)
 
 ### Added
